@@ -60,3 +60,12 @@
   .media-download {@apply my-6 rounded-2xl p-5 bg-palegold/40 border border-bronze/20;} .media-download h2 {@apply text-xl;} .media-download p {@apply text-sm;} .media-download .button {@apply text-xs;} .pdf-download {@apply mt-5 w-full;}
 }
 
+
+.history-row { padding: 1rem 0; border-bottom: 1px solid #E6D8B8; }
+.record-version { margin: 1rem 0 1.5rem; color: #68512B; }
+.search-form { margin-bottom: 1.5rem; }
+.pagination { margin: 1.5rem 0; flex-wrap: wrap; }
+.form-message a { display: inline-block; margin-top: .6rem; font-weight: 700; text-decoration: underline; }
+.attribution textarea { background: #FFFBF1; }
+.site-header nav { flex-wrap: wrap; }
+textarea[readonly] { cursor: text; }

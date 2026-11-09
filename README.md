@@ -28,7 +28,7 @@ php vendor/phpunit/phpunit/phpunit
 npm run build
 ```
 
-Database integration tests require ignored `config/test.php` pointing to a dedicated database named exactly `story_passport_test`. Copy local settings, change the database and private storage path, and apply migrations against it. Tests create fixtures and do not truncate a database. HTTP tests additionally require `PASSPORT_TEST_URL` pointing to the PHP server running with `PASSPORT_CONFIG` set to that test configuration. Never point these tests at a live site.
+Database integration tests require ignored `config/test.php` pointing to a dedicated database named exactly `story_passport_test`. Copy local settings, change the database and private storage path, and apply migrations against it. Tests create fixtures without truncating existing data. Community-tools and upgrade checks use the isolated loopback MySQL server on port 3317 and require permission to create/drop randomly named temporary databases prefixed story_passport_upgrade_test_; they never use the hosted database. HTTP tests additionally require `PASSPORT_TEST_URL` pointing to the PHP server running with `PASSPORT_CONFIG` set to that test configuration. Never point these tests at a live site.
 
 ## Handover
 
@@ -37,8 +37,10 @@ Database integration tests require ignored `config/test.php` pointing to a dedic
 - [Specification](docs/SPEC.md): current PHP interfaces and resolved design decisions.
 - [Review](docs/REVIEW.md): results and checks that still require hosting access.
 
-The initial implementation spans registry, rules, frontend, demo and QA ownership areas under the user-approved unified build plan. No external payment, identity, email-sending, analytics, or AI services are integrated.
+The initial implementation spans registry, rules, frontend, demo and QA ownership areas under the user-approved unified build plan. No external payment, identity, analytics or AI services are integrated. The community-tools release adds optional SMTP request updates, disabled until configured.
 
 For a subdomain folder without SSH, use [Deploy without SSH](docs/DEPLOYMENT-SHARED.md).
 
-See [Passport/media exports](docs/PASSPORT-EXPORTS.md) for percentage inputs, QR-marked downloads and branded PDFs. No database migration is required.
+See [Passport/media exports](docs/PASSPORT-EXPORTS.md) for percentage inputs, QR-marked downloads and branded PDFs. That earlier media-only update required no database migration.
+
+For the latest release, see [Community tools and upgrade without SSH](docs/COMMUNITY-TOOLS.md). This release **requires the non-destructive 002 database migration before the new application files are installed**.

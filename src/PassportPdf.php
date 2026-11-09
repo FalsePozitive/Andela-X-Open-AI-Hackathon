@@ -17,7 +17,7 @@ final class PassportPdf
         if (!is_dir($cache) && !mkdir($cache, 0700, true) && !is_dir($cache)) {
             throw new \RuntimeException('Cannot create PDF cache.');
         }
-        $cacheFile = $cache . '/' . hash('sha256', 'pdf-v2|' . json_encode($story, JSON_THROW_ON_ERROR) . '|' . $config['base_url'] . '|' . gmdate('Y-m-d')) . '.pdf';
+        $cacheFile = $cache . '/' . hash('sha256', 'pdf-v4|' . json_encode($story, JSON_THROW_ON_ERROR) . '|' . $config['base_url'] . '|' . gmdate('Y-m-d')) . '.pdf';
         if (is_file($cacheFile)) {return (string) file_get_contents($cacheFile);}
         $options = new Options();
         $options->set('isRemoteEnabled', false); $options->set('isPhpEnabled', false); $options->set('isJavascriptEnabled', false);
@@ -37,6 +37,7 @@ final class PassportPdf
         }
         $e = Web::escape(...);
         $url = Watermark::url($rawStory, $config);
+        $credit=Rules::credit($rawStory,$config['base_url']);
         $title = $story['title'] ?? Copy::UI['restricted'];
         $issued = gmdate('d M Y') . ' (UTC)';
         ob_start();require dirname(__DIR__) . '/templates/pdf.php';$html = (string) ob_get_clean();

@@ -1,0 +1,1 @@
+<input type="hidden" name="expectedRevision" data-int value="<?= $e($story['revision']) ?>"><label><?= $e($t('Reason for this change')) ?><textarea name="reason" maxlength="2000" required></textarea></label>

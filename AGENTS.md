@@ -118,3 +118,6 @@ User-approved name: Okwethu (Ours). Goldenrod #DAA520 is the primary brand colou
 ## Passport/media update
 User-approved additions: visible percentage shares totalling 100% (stored as exact integer basis points), QR-marked image derivatives, browser video export, audio plus QR-cover ZIP downloads, branded public PDF snapshots, and tighter logo tagline spacing. Originals and registration hashes remain private and unchanged. A media mark supports attribution; it is not copy protection or proof of ownership. This work spans registry, rules, frontend, exports, documentation and QA.
 
+
+## Community tools approval
+The user explicitly approved editable records and private versions, consent withdrawal and sharing controls, private request tracking and optional SMTP updates, individual accounts with community-scoped roles, search, and preferred attribution (features 1, 3, 4, 5, 6, 7). Individual accounts supersede the earlier fixed-login-only scope. This release spans registry, ledger/consent, frontend, demo and QA ownership areas. See docs/COMMUNITY-TOOLS.md for upgrade, role boundaries and verification. Keep existing approvals and ledger entries immutable. Never reset a hosted database as part of deployment.

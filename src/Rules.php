@@ -41,7 +41,7 @@ final class Rules
     {
         self::split($shares);
         if ($amount < 0 || $amount > self::MAX_MONEY) {
-            throw new Problem('INVALID_AMOUNT', 'MOCK amounts must be between 0 and 1,000,000,000 minor units.');
+            throw new Problem('INVALID_AMOUNT', 'Demo amounts must be between 0 and 1,000,000,000 minor units.');
         }
         $result = [];
         foreach ($shares as $share) {
@@ -73,6 +73,8 @@ final class Rules
     public static function approvalReasons(array $request, array $story): array
     {
         $reasons = [];
+        if (($story['sharingState']??'ACTIVE')!=='ACTIVE') {$reasons[]='Sharing is paused or withdrawn.';}
+        foreach ($story['contributors'] as $person) {if (!($person['consents']['PUBLISH']['granted']??false)) {$reasons[]='Publication consent is missing or withdrawn.';break;}}
         $ai = $request['isAiTraining'] || self::aiIntent($request['intendedUse']);
         if ($ai && !$story['license']['aiTrainingAllowed']) {
             $reasons[] = 'The declared terms do not allow AI training.';
@@ -88,20 +90,42 @@ final class Rules
         return $reasons;
     }
 
+    public static function isPublic(array $story): bool
+    {
+        if ($story['sensitivity']!=='OPEN' || ($story['sharingState']??'ACTIVE')!=='ACTIVE') {return false;}
+        // Older fixture-only callers omit contributors; live records always include them.
+        if (!array_key_exists('contributors',$story)) {return false;}
+        if ($story['contributors']===[]) {return false;}
+        foreach ($story['contributors'] as $person) {
+            if (!($person['consents']['PUBLISH']['granted']??false)) {return false;}
+        }
+        return true;
+    }
+
+    public static function credit(array $story, string $base): string
+    {
+        if (!self::isPublic($story)) {return 'Okwethu passport '.$story['id'].' · Contact the steward for details.';}
+        $credit=trim($story['preferredCredit']??'');
+        if ($credit==='') {$credit=$story['title'].' — '.$story['creator']['name'].'. Contributors: '.implode(', ',array_column($story['contributors'],'name')).'.';}
+        return $credit.' · '.rtrim($base,'/').'/p/'.$story['id'].' · Check the current declared terms and consent before use.';
+    }
+
     public static function publicStory(array $story): array
     {
         $minimal = [
-            'id' => $story['id'], 'sensitivity' => $story['sensitivity'],
+            'id' => $story['id'], 'sensitivity' => self::isPublic($story) ? 'OPEN' : 'RESTRICTED',
+            'sharingState'=>$story['sharingState']??'ACTIVE', 'revision'=>$story['revision']??1, 'updatedAt'=>$story['updatedAt']??null,
+            'accessState'=>($story['sharingState']??'ACTIVE')!=='ACTIVE' ? $story['sharingState'] : ($story['sensitivity']==='RESTRICTED' ? 'RESTRICTED' : (self::isPublic($story)?'OPEN':'CONSENT_REQUIRED')),
             'status' => $story['status'], 'createdAt' => $story['createdAt'],
             'creator' => ['name' => $story['creator']['name'], 'type' => $story['creator']['type']],
             'contactEmail' => $story['license']['contactEmail'],
         ];
-        if ($story['sensitivity'] === 'RESTRICTED') {
+        if (!self::isPublic($story)) {
             return $minimal;
         }
         // Explicit allowlist: never serialize the internal record to the public.
         return $minimal + [
-            'title' => $story['title'], 'mediaType' => $story['mediaType'],
+            'communityName'=>$story['communityName']??'', 'preferredCredit'=>$story['preferredCredit']??'', 'title' => $story['title'], 'mediaType' => $story['mediaType'],
             'textBody' => $story['textBody'], 'mediaUrl' => $story['filePath'] ? '/media/' . $story['id'] : null,
             'language' => $story['language'], 'placeCoarse' => $story['placeCoarse'],
             'contextNote' => $story['contextNote'], 'license' => $story['license'],

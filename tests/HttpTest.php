@@ -34,10 +34,10 @@ final class HttpTest extends TestCase
         $length=curl_getinfo($curl,CURLINFO_HEADER_SIZE);$status=curl_getinfo($curl,CURLINFO_RESPONSE_CODE);curl_close($curl);
         return ['status'=>$status,'headers'=>substr($raw,0,$length),'body'=>substr($raw,$length)];
     }
-    private function login():void
+    private function login(string $username='steward',string $password='Test-only-password-1907'):void
     {
         $curl=curl_init($this->url.'/login');
-        curl_setopt_array($curl,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_POST=>true,CURLOPT_COOKIEJAR=>$this->cookies,CURLOPT_COOKIEFILE=>$this->cookies,CURLOPT_POSTFIELDS=>http_build_query(['_csrf'=>$this->csrf,'username'=>'steward','password'=>'Test-only-password-1907'])]);
+        curl_setopt_array($curl,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_POST=>true,CURLOPT_COOKIEJAR=>$this->cookies,CURLOPT_COOKIEFILE=>$this->cookies,CURLOPT_POSTFIELDS=>http_build_query(['_csrf'=>$this->csrf,'username'=>$username,'password'=>$password])]);
         curl_exec($curl);self::assertSame(303,curl_getinfo($curl,CURLINFO_RESPONSE_CODE));curl_close($curl);unset($curl);
         $this->csrf=json_decode($this->call('GET','/api/session')['body'],true,512,JSON_THROW_ON_ERROR)['csrf'];
     }
@@ -90,5 +90,42 @@ final class HttpTest extends TestCase
         $body=curl_exec($curl);self::assertSame(201,curl_getinfo($curl,CURLINFO_RESPONSE_CODE),is_string($body)?$body:'No response');curl_close($curl);unset($curl);$id=json_decode($body,true,512,JSON_THROW_ON_ERROR)['id'];
         $story=$this->registry->story($id);self::assertSame([7000,3000],array_column($story['shares'],'bps'));
         foreach(['/media/'.$id,'/api/stories/'.$id.'/download'] as $url){$image=$this->call('GET',$url);self::assertSame(200,$image['status']);self::assertStringStartsWith("\x89PNG",$image['body']);self::assertStringContainsString('image/png',$image['headers']);}
+    }
+
+    public function testRequestTrackingAndCounterReplyThroughHttp():void
+    {
+        $story=$this->registry->create(Demo::payload());
+        $response=$this->call('POST','/api/stories/'.$story['id'].'/requests',['requesterName'=>'Test requester','requesterContact'=>'test-requester@example.com','intendedUse'=>'Commercial booklet','isCommercial'=>true]);
+        self::assertSame(201,$response['status']);$request=json_decode($response['body'],true);$token=basename($request['trackingUrl']);
+        $this->registry->decide($request['id'],['status'=>'COUNTERED','counterFeeMinor'=>7,'note'=>'Proposed test fee.']);
+        self::assertSame(200,$this->call('GET','/r/'.$token)['status']);
+        self::assertSame(403,$this->call('POST','/api/tracking/'.$token,['response'=>'ACCEPTED','counterVersion'=>1],false)['status']);
+        self::assertSame(200,$this->call('POST','/api/tracking/'.$token,['response'=>'ACCEPTED','counterVersion'=>1])['status']);
+        self::assertSame(409,$this->call('POST','/api/tracking/'.$token,['response'=>'ACCEPTED','counterVersion'=>1])['status']);
+        self::assertSame(404,$this->call('GET','/r/'.str_repeat('0',64))['status']);
+        self::assertSame(401,$this->call('POST','/api/requests/'.$request['id'].'/link',[])['status']);
+    }
+    public function testWithdrawnPublicationStopsCachedContentAcrossPublicRoutes():void
+    {
+        $data=Demo::payload('WITHDRAWN_TITLE_1907');$data['textBody']='WITHDRAWN_BODY_1907';$story=$this->registry->create($data);
+        self::assertStringContainsString('WITHDRAWN_TITLE_1907',$this->call('GET','/p/'.$story['id'])['body']);
+        self::assertSame(200,$this->call('GET','/api/stories/'.$story['id'].'/pdf')['status']);
+        $this->registry->consent($story['id'],['updates'=>[['contributorId'=>$story['contributors'][0]['id'],'purpose'=>'PUBLISH','granted'=>false]]]);
+        foreach(['/api/stories/'.$story['id'],'/p/'.$story['id'],'/?q=WITHDRAWN_TITLE_1907'] as $path){$response=$this->call('GET',$path);self::assertSame(200,$response['status']);self::assertStringNotContainsString('WITHDRAWN_BODY_1907',$response['body']);if(!str_contains($path,'?'))self::assertStringNotContainsString('WITHDRAWN_TITLE_1907',$response['body']);self::assertStringContainsString('no-store',$response['headers']);}
+        self::assertSame(404,$this->call('GET','/api/stories/'.$story['id'].'/credit')['status']);
+        $pdf=$this->call('GET','/api/stories/'.$story['id'].'/pdf');self::assertSame(200,$pdf['status']);file_put_contents(__DIR__.'/.runtime/exports/withdrawn.pdf',$pdf['body']);
+    }
+    public function testCommunityAccessChecksAlsoProtectDirectHttpLinks():void
+    {
+        $config=require dirname(__DIR__).'/config/test.php';$accounts=new Passport\Accounts($this->registry->db,$config);$owner=$accounts->login('steward','Test-only-password-1907');
+        $community=$accounts->manage($owner,['action'=>'community','name'=>'HTTP test collection'])['id'];$name='http-'.bin2hex(random_bytes(4));
+        $accounts->manage($owner,['action'=>'account','username'=>$name,'displayName'=>'HTTP test reviewer','email'=>'reviewer@example.com','password'=>'Temporary-test-password-1907','communityId'=>$community,'role'=>'REVIEWER']);
+        $unrelated=$this->registry->create(Demo::payload('Private other-collection title.'));$payload=Demo::payload('Assigned review record.');$payload['communityId']=$community;$assigned=$this->registry->create($payload);
+        $this->login($name,'Temporary-test-password-1907');
+        foreach(['/api/steward/stories/'.$unrelated['id'],'/api/steward/stories/'.$unrelated['id'].'/history','/dashboard/stories/'.$unrelated['id'],'/dashboard/stories/'.$unrelated['id'].'/history/1','/api/ledger?storyId='.$unrelated['id']] as $path){self::assertSame(403,$this->call('GET',$path)['status'],$path);}
+        $page=$this->call('GET','/dashboard/stories/'.$assigned['id']);self::assertSame(200,$page['status']);self::assertStringNotContainsString('data-consent=',$page['body']);
+        self::assertSame(403,$this->call('PATCH','/api/stories/'.$assigned['id'].'/edit',['action'=>'credit','expectedRevision'=>1,'reason'=>'Attempted edit','preferredCredit'=>'Unapproved credit'])['status']);
+        self::assertSame(403,$this->call('GET','/dashboard/team')['status']);
+        $desk=$this->call('GET','/dashboard');self::assertStringNotContainsString('Private other-collection title.',$desk['body']);self::assertStringContainsString('Assigned review record.',$desk['body']);
     }
 }

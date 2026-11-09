@@ -31,7 +31,7 @@ final class Watermark
 
     public static function original(array $story, array $config): string
     {
-        if ($story['sensitivity'] !== 'OPEN' || !is_string($story['filePath']) || !preg_match('/^[a-f0-9]{48}$/', $story['filePath'])) {
+        if (!Rules::isPublic($story) || !is_string($story['filePath']) || !preg_match('/^[a-f0-9]{48}$/', $story['filePath'])) {
             throw new Problem('NOT_FOUND', 'Media not available.', 404);
         }
         $path = $config['storage_path'] . '/uploads/' . $story['filePath'];
@@ -114,7 +114,7 @@ final class Watermark
         if ($story['mediaType'] !== 'audio') {throw new Problem('NOT_FOUND', 'Audio not available.', 404);}
         if (!class_exists(\ZipArchive::class)) {throw new Problem('UNAVAILABLE', 'Audio packages need the PHP ZIP extension enabled by the host.', 503);}
         $extension = $story['mimeType'] === 'audio/mpeg' ? 'mp3' : 'wav';
-        $path = self::directory($config) . '/' . hash('sha256', 'audio-v1|' . $story['id'] . '|' . hash_file('sha256', $source) . '|' . self::url($story, $config)) . '.zip';
+        $path = self::directory($config) . '/' . hash('sha256', 'audio-v2|'.($story['revision']??1).'|'.Rules::credit($story,$config['base_url']).'|' . $story['id'] . '|' . hash_file('sha256', $source) . '|' . self::url($story, $config)) . '.zip';
         if (is_file($path)) {return $path;}
         $cover = self::cover($story, $config); $temporary = tempnam(dirname($path), 'zip-');
         if ($temporary === false) {throw new \RuntimeException('Cannot create audio package.');}
@@ -122,6 +122,7 @@ final class Watermark
         if ($zip->open($temporary, \ZipArchive::OVERWRITE) !== true) {throw new \RuntimeException('Cannot write audio package.');}
         $zip->addFile($source, 'audio-' . $story['id'] . '.' . $extension);
         $zip->addFile($cover, 'okwethu-qr-cover.png');
+        $zip->addFromString('ATTRIBUTION.txt',Rules::credit($story,$config['base_url']));
         $zip->addFromString('READ-ME.txt', 'Okwethu story passport: ' . self::url($story, $config) . "\nKeep the QR cover with this audio when sharing. The QR is on the cover, not in the sound.\nRead the live passport and obtain any required permission before use. A QR is not proof of ownership or permission.\n");
         $zip->close(); chmod($temporary, 0600);
         if (!rename($temporary, $path)) {unlink($temporary); throw new \RuntimeException('Cannot save audio package.');}

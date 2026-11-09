@@ -9,7 +9,7 @@ final class PackageTest extends TestCase
         $files=glob(dirname(__DIR__).'/dist/story-passport-*.zip')?:[];
         if(!$files){self::markTestSkipped('Build a production release first.');}
         sort($files);$archive=end($files);$zip=new ZipArchive();self::assertTrue($zip->open($archive));
-        foreach(['src/Registry.php','public/index.php','public/.htaccess','resources/copy.php','vendor/autoload.php','config/example.php','database/migrations/001_registry.sql'] as $required){self::assertNotFalse($zip->locateName($required),$required);}
+        foreach(['src/Registry.php','public/index.php','public/.htaccess','resources/copy.php','vendor/autoload.php','config/example.php','database/migrations/001_registry.sql','database/migrations/002_community_tools.sql','src/Accounts.php','src/StoryChanges.php','src/RequestUpdates.php','src/Mailbox.php','templates/tracking.php','vendor/phpmailer/phpmailer/src/PHPMailer.php'] as $required){self::assertNotFalse($zip->locateName($required),$required);}
         for($i=0;$i<$zip->numFiles;$i++) {
             $name=$zip->getNameIndex($i);
             self::assertDoesNotMatchRegularExpression('~(^|/)(local\.php|test\.php|\.env|\.git|node_modules|phpunit|phpstan|\.tools|preview-login\.txt)(/|$)~',$name);

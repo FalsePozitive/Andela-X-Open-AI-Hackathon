@@ -52,7 +52,7 @@ final class Input
             return null;
         }
         if (!is_int($value) || $value < ($signed ? -Rules::MAX_MONEY : 0) || $value > Rules::MAX_MONEY) {
-            throw new Problem('INVALID_AMOUNT', 'Enter a valid whole number of MOCK minor units.');
+            throw new Problem('INVALID_AMOUNT', 'Enter a valid whole number of demo minor units.');
         }
         return $value;
     }

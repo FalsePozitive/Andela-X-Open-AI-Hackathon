@@ -49,7 +49,7 @@ final class RulesTest extends TestCase
 
     public function testMissingCommercialConsentBlocksApproval(): void
     {
-        $story = ['license'=>['aiTrainingAllowed'=>false], 'contributors'=>[['name'=>'Person','consents'=>[]]]];
+        $story = ['license'=>['aiTrainingAllowed'=>false], 'contributors'=>[['name'=>'Person','consents'=>['PUBLISH'=>['granted'=>true]]]]];
         $reasons = Rules::approvalReasons(['isCommercial'=>true,'isAiTraining'=>false,'intendedUse'=>'Print a booklet'], $story);
         self::assertCount(1, $reasons);
         $story['contributors'][0]['consents']['COMMERCIAL']['granted'] = false;
@@ -58,7 +58,7 @@ final class RulesTest extends TestCase
 
     public function testAiRequiresBothTermsAndEveryConsent(): void
     {
-        $story = ['license'=>['aiTrainingAllowed'=>false], 'contributors'=>[['name'=>'Person','consents'=>[]]]];
+        $story = ['license'=>['aiTrainingAllowed'=>false], 'contributors'=>[['name'=>'Person','consents'=>['PUBLISH'=>['granted'=>true]]]]];
         $request = ['isCommercial'=>false,'isAiTraining'=>true,'intendedUse'=>'Research'];
         self::assertCount(2, Rules::approvalReasons($request,$story));
         $story['license']['aiTrainingAllowed'] = true;
@@ -74,7 +74,7 @@ final class RulesTest extends TestCase
         $story = Demo::payload();
         $story += ['id'=>'ABCD-EFGH','status'=>'UNVERIFIED','createdAt'=>'2026-01-01','filePath'=>'secret','contentHash'=>'secret'];
         $story['sensitivity'] = 'RESTRICTED';
-        self::assertSame(['id','sensitivity','status','createdAt','creator','contactEmail'],array_keys(Rules::publicStory($story)));
+        self::assertSame(['id','sensitivity','sharingState','revision','updatedAt','accessState','status','createdAt','creator','contactEmail'],array_keys(Rules::publicStory($story)));
         self::assertSame(['name','type'],array_keys(Rules::publicStory($story)['creator']));
     }
 

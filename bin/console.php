@@ -25,6 +25,7 @@ try {
         foreach (['src', 'templates', 'bin', 'public', 'tests', 'config', 'resources'] as $folder) {
             $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(dirname(__DIR__) . '/' . $folder, FilesystemIterator::SKIP_DOTS));
             foreach ($iterator as $file) {
+                if (str_contains(str_replace('\\','/',$file->getPathname()),'/tests/.runtime/')) {continue;}
                 if ($file->getExtension() === 'php') {
                     passthru(escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg($file->getPathname()), $code);
                     $failed = $failed || $code !== 0;
@@ -74,7 +75,7 @@ try {
         }
         // Explicitly guarded destructive operation, restricted to this demo schema.
         $db->exec('SET FOREIGN_KEY_CHECKS=0');
-        foreach (['ledger_entries','claims','permission_requests','consents','split_shares','licenses','contributors','stories','creators','login_guard'] as $table) {
+        foreach (['mail_outbox','request_events','request_tokens','story_revisions','ledger_entries','claims','permission_requests','consents','split_shares','licenses','contributors','stories','creators','login_guard'] as $table) {
             $db->exec('TRUNCATE TABLE ' . $table);
         }
         $db->exec('SET FOREIGN_KEY_CHECKS=1');

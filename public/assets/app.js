@@ -32,9 +32,17 @@ async function submit(form, action) {
 document.querySelectorAll('form[data-api]').forEach(form => form.addEventListener('submit', event => {
   event.preventDefault();
   submit(form, async () => {
-    const result = await send(form.dataset.api, values(form), form.dataset.method || 'POST');
+    const payload=values(form);
+    if (form.hasAttribute('data-terms')) payload.shares=[...form.querySelectorAll('[data-share-id]')].map(input=>({contributorId:input.dataset.shareId,percentage:input.value}));
+    const result = await send(form.dataset.api, payload, form.dataset.method || 'POST');
     if (form.hasAttribute('data-reload')) { location.reload(); return; }
     form.querySelector('.form-message').textContent = messages[form.dataset.success || 'saved'] + (result.aiFlag ? ' ' + messages.aiFlag : '');
+    if (result.trackingUrl) {
+      const message=form.querySelector('.form-message');const link=document.createElement('a');
+      link.href=result.trackingUrl;link.textContent=messages.privateTracking || 'Save your private tracking link';message.append(document.createElement('br'),link);
+      const hint=document.createElement('p');hint.textContent=messages.trackingHint || 'Anyone with this link can view and respond to your request. Keep it private; it expires after 30 days.';message.append(hint);
+      if(result.emailDelivery==='disabled') {const note=document.createElement('p');note.textContent=messages.emailDisabled || 'Email delivery is currently disabled. Save this link to follow your request.';message.append(note);}
+    }
     if (!form.dataset.method) form.reset();
   });
 }));
@@ -42,8 +50,8 @@ document.querySelectorAll('form[data-consent]').forEach(form => form.addEventLis
   event.preventDefault();
   submit(form, async () => {
     const updates = [...form.querySelectorAll('[data-purpose]')].map(box => ({contributorId: box.dataset.person, purpose: box.dataset.purpose, granted: box.checked}));
-    await send(`/api/stories/${form.dataset.consent}/consent`, {updates}, 'PATCH');
-    form.querySelector('.form-message').textContent = messages.saved;
+    await send(`/api/stories/${form.dataset.consent}/consent`, {updates,expectedRevision:Number(form.elements.expectedRevision.value),reason:form.elements.reason.value}, 'PATCH');
+    location.reload();
   });
 }));
 document.querySelector('[data-print]')?.addEventListener('click', () => window.print());
@@ -91,7 +99,7 @@ if (wizard) {
     if (step===3) shareFields();
     if (step===4) {const review=document.querySelector('#review'); review.replaceChildren(); const data=payload(); for (const text of [`${data.title} · ${data.mediaType} · ${data.sensitivity}`,`${data.creator.name} · ${data.language}`,data.contextNote,`${messages.terms}: ${data.license.preset} · ${messages.aiTraining}: ${data.license.aiTrainingAllowed?messages.aiAllowed:messages.aiNotAllowed}`,`${messages.stewardContact}: ${data.license.contactEmail}`,...data.contributors.map(p => `${p.name} (${p.role}): ${p.percentage}% · ${messages.granted}: ${Object.entries(p.consents).filter(([,v])=>v).map(([k])=>k).join(', ')||messages.none}`)]) {const p=document.createElement('p'); p.textContent=text; review.append(p);}}
   }
-  function payload() {const f=wizard.elements; return {title:f.title.value,language:f.language.value,creator:{type:f.creatorType.value,name:f.creatorName.value,representativeName:f.representativeName.value},mediaType:f.mediaType.value,sensitivity:f.sensitivity.value,textBody:f.textBody.value,placeCoarse:f.placeCoarse.value,contextNote:f.contextNote.value,license:{preset:f.preset.value,aiTrainingAllowed:f.aiTrainingAllowed.checked,contactEmail:f.contactEmail.value,notes:f.notes.value},termsConfirmed:f.termsConfirmed.checked,sharesConfirmed:f.sharesConfirmed.checked,contributors:people().map(({key,bps,...p})=>p)};}
+  function payload() {const f=wizard.elements; return {communityId:f.communityId?.value,title:f.title.value,language:f.language.value,creator:{type:f.creatorType.value,name:f.creatorName.value,representativeName:f.representativeName.value},mediaType:f.mediaType.value,sensitivity:f.sensitivity.value,textBody:f.textBody.value,placeCoarse:f.placeCoarse.value,contextNote:f.contextNote.value,license:{preset:f.preset.value,aiTrainingAllowed:f.aiTrainingAllowed.checked,contactEmail:f.contactEmail.value,notes:f.notes.value},termsConfirmed:f.termsConfirmed.checked,sharesConfirmed:f.sharesConfirmed.checked,contributors:people().map(({key,bps,...p})=>p)};}
   next.addEventListener('click', () => {
     const invalid=[...sections[step].querySelectorAll('input,textarea,select')].find(field=>!field.checkValidity()); if (invalid) {invalid.reportValidity(); return;}
     if (step===0 && wizard.elements.creatorType.value==='COMMUNITY' && !wizard.elements.representativeName.value.trim()) {wizard.querySelector('.form-message').textContent=messages.addRepresentative; return;}
@@ -108,3 +116,14 @@ if (wizard) {
   addPerson(); show();
 }
 
+
+document.querySelector('[data-copy-credit]')?.addEventListener('click',async()=>{
+  const field=document.querySelector('#credit-line');const message=document.querySelector('[data-copy-message]');
+  try {await navigator.clipboard.writeText(field.value);message.textContent=messages.creditCopied;}
+  catch {field.focus();field.select();message.textContent=messages.creditManual;}
+});
+document.querySelectorAll('[data-terms]').forEach(form=>{
+  const fields=[...form.querySelectorAll('[data-share-id]')];const total=form.querySelector('[data-share-total]');
+  const update=()=>{const sum=fields.reduce((n,f)=>{const value=f.value;if(!/^\d+(?:\.\d{1,2})?$/.test(value))return NaN;const [whole,fraction='']=value.split('.');return n+Number(whole)*100+Number(fraction.padEnd(2,'0'));},0);total.textContent=`${messages.total}: ${Number.isFinite(sum)?(sum/100).toFixed(2):'—'}%`;total.classList.toggle('error',sum!==10000);};
+  fields.forEach(f=>f.addEventListener('input',update));update();
+});

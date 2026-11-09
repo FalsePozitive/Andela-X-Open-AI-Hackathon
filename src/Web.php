@@ -22,8 +22,8 @@ final class Web
 
     public function steward(): void
     {
-        if (empty($_SESSION['steward'])) {
-            throw new Problem('UNAUTHORIZED', 'Please sign in as the demo steward.', 401);
+        if (empty($this->registry->actor['id'])) {
+            throw new Problem('UNAUTHORIZED', 'Please sign in to your steward account.', 401);
         }
     }
 
@@ -65,17 +65,21 @@ final class Web
         session_start();
         $_SESSION['csrf'] ??= bin2hex(random_bytes(32));
         if (isset($_SESSION['lastActive']) && time() - $_SESSION['lastActive'] > 3600) {
-            unset($_SESSION['steward']);
+            unset($_SESSION['steward'],$_SESSION['accountId'],$_SESSION['authVersion']);
         }
         $_SESSION['lastActive'] = time();
         header('Cache-Control: no-store, private');
         header('X-Content-Type-Options: nosniff');
-        header('Referrer-Policy: same-origin');
+        header('Referrer-Policy: no-referrer');
         header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
         $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/';
         $method = $_SERVER['REQUEST_METHOD'];
         $api = str_starts_with($path, '/api/');
         try {
+            if (!Database::run($this->registry->db,'SELECT version FROM migrations WHERE version=?',['002_community_tools.sql'])->fetchColumn()) {throw new Problem('UPGRADE_REQUIRED','This release needs its database update. Ask the site operator to import the community-tools upgrade SQL.',503);}
+            $accounts=new Accounts($this->registry->db,$this->config);
+            $this->registry->actor=$accounts->current()??[];
+            $_SESSION['steward']=!empty($this->registry->actor['id']);
             if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 11 * 1024 * 1024) {
                 throw new Problem('UPLOAD_TOO_LARGE', 'The request exceeds the upload limit.', 413);
             }
@@ -106,7 +110,7 @@ final class Web
             }
             if (preg_match('~^/media/([A-Z2-9]{4}-[A-Z2-9]{4})$~', $path, $m)) {
                 $story = $this->registry->story($m[1]);
-                if ($story['sensitivity'] === 'RESTRICTED' || !$story['filePath']) {
+                if (!Rules::isPublic($story) || !$story['filePath']) {
                     throw new Problem('NOT_FOUND', 'Media not available.', 404);
                 }
                 $file = $story['mediaType'] === 'image' ? Watermark::image($story, $this->config) : Watermark::original($story, $this->config);
@@ -114,7 +118,7 @@ final class Web
                 $this->file($file, $mime, 'okwethu-' . $story['id'] . ($story['mediaType'] === 'image' ? '.png' : ''), isset($_GET['download']));
             }
             if ($path === '/') {
-                $this->page('home', ['stories' => $this->registry->stories()]);
+                $this->page('home', Catalog::search($this->registry->stories(),$_GET));
             } elseif ($path === '/about') {
                 $this->page('about');
             } elseif ($path === '/faq') {
@@ -122,19 +126,32 @@ final class Web
             } elseif ($path === '/login') {
                 $this->page('login');
             } elseif (preg_match('~^/p/([A-Z2-9]{4}-[A-Z2-9]{4})$~', $path, $m)) {
-                $this->page('passport', ['story' => Rules::publicStory($this->registry->story($m[1]))]);
+                $raw=$this->registry->story($m[1]);
+                $this->page('passport', ['story' => Rules::publicStory($raw),'credit'=>Rules::credit($raw,$this->config['base_url'])]);
+            } elseif (preg_match('~^/r/([a-f0-9]{64})$~',$path,$m)) {
+                $this->page('tracking',['request'=>(new RequestUpdates($this->registry->db,$this->config))->get($m[1]),'token'=>$m[1]]);
             } elseif (str_starts_with($path, '/dashboard') || $path === '/ledger') {
                 $this->steward();
                 if ($path === '/dashboard') {
-                    $this->page('dashboard', ['stories' => $this->registry->stories(true)]);
+                    $this->page('dashboard', Catalog::search($this->registry->stories(true),$_GET));
                 } elseif ($path === '/dashboard/new') {
+                    if (!$accounts->communities($this->registry->actor,true)) {throw new Problem('FORBIDDEN','Your role can review records, but cannot register stories.',403);}
                     $this->page('new');
                 } elseif ($path === '/dashboard/requests') {
                     $this->page('requests', ['requests' => $this->registry->requests()]);
                 } elseif ($path === '/dashboard/claims') {
                     $this->page('claims', ['claims' => $this->registry->claims()]);
                 } elseif (preg_match('~^/dashboard/stories/([A-Z2-9]{4}-[A-Z2-9]{4})$~', $path, $m)) {
-                    $this->page('manage', ['story' => $this->registry->story($m[1])]);
+                    $this->page('manage', ['story' => $this->registry->privateStory($m[1]),'history'=>(new StoryChanges($this->registry))->history($m[1])]);
+                } elseif ($path === '/dashboard/account') {
+                    $this->page('account');
+                } elseif ($path === '/dashboard/team') {
+                    $this->page('team',$accounts->team($this->registry->actor));
+                } elseif ($path === '/dashboard/notifications') {
+                    $mail=new Mailbox($this->registry->db,$this->config);
+                    $this->page('notifications',['jobs'=>$mail->pending(array_column($accounts->communities($this->registry->actor,true),'id')),'mailEnabled'=>$mail->enabled()]);
+                } elseif (preg_match('~^/dashboard/stories/([^/]+)/history/([0-9]+)$~',$path,$m)) {
+                    $this->page('revision',['snapshot'=>(new StoryChanges($this->registry))->version($m[1],(int)$m[2])]);
                 } elseif ($path === '/ledger') {
                     $this->page('ledger', ['ledger' => $this->registry->ledger(isset($_GET['storyId']) && is_string($_GET['storyId']) ? $_GET['storyId'] : null)]);
                 } else {
@@ -164,24 +181,9 @@ final class Web
 
     private function login(): void
     {
-        $db = $this->registry->db;
-        $db->beginTransaction();
-        $guard = Database::run($db, 'SELECT *, blocked_until > UTC_TIMESTAMP() AS blocked FROM login_guard WHERE id=1 FOR UPDATE')->fetch();
-        if ($guard && $guard['blocked']) {
-            $db->rollBack();
-            throw new Problem('RATE_LIMIT', 'Sign in is temporarily paused. Please try again in fifteen minutes.', 429);
-        }
-        $valid = is_string($_POST['password'] ?? null) && is_string($_POST['username'] ?? null)
-            && $this->config['steward_password_hash'] !== ''
-            && hash_equals($this->config['steward_name'], $_POST['username'])
-            && password_verify($_POST['password'], $this->config['steward_password_hash']);
-        if (!$valid) {
-            Database::run($db, 'UPDATE login_guard SET failures=IF(blocked_until IS NOT NULL AND blocked_until <= UTC_TIMESTAMP(),1,failures+1),blocked_until=IF(failures>=5,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 15 MINUTE),NULL) WHERE id=1');
-            $db->commit();
-            throw new Problem('LOGIN', 'The sign-in details were not accepted.', 403);
-        }
-        Database::run($db, 'UPDATE login_guard SET failures=0,blocked_until=NULL WHERE id=1');
-        $db->commit();
+        if (!is_string($_POST['username']??null) || !is_string($_POST['password']??null)) {throw new Problem('LOGIN','The sign-in details were not accepted.',403);}
+        $user=(new Accounts($this->registry->db,$this->config))->login($_POST['username'],$_POST['password']);
+        $_SESSION['accountId']=$user['id'];$_SESSION['authVersion']=(int)$user['auth_version'];
         session_regenerate_id(true);
         $_SESSION['csrf'] = bin2hex(random_bytes(32));
         $_SESSION['steward'] = true;
@@ -238,8 +240,40 @@ final class Web
             $data = $this->input();
             $this->json($m[2] === 'requests' ? $this->registry->request($m[1], $data) : $this->registry->claim($m[1], $data), 201);
         }
+        if ($method==='POST' && preg_match('~^/api/tracking/([a-f0-9]{64})$~',$path,$m)) {
+            $updates=new RequestUpdates($this->registry->db,$this->config);
+            $result=$updates->reply($m[1],$this->input());$updates->dispatch($updates->get($m[1])['id']);$this->json($result);
+        }
+        if ($method==='GET' && preg_match('~^/api/stories/([^/]+)/credit$~',$path,$m)) {
+            $raw=$this->registry->story($m[1]);
+            if (!Rules::isPublic($raw)) {throw new Problem('NOT_FOUND','Attribution is not public for this record.',404);}
+            header('Content-Type: text/plain; charset=utf-8');header('Content-Disposition: attachment; filename="okwethu-credit-'.$raw['id'].'.txt"');
+            echo Rules::credit($raw,$this->config['base_url']);exit;
+        }
         $this->steward();
-        if ($method === 'POST' && $path === '/api/stories') {
+        $accounts=new Accounts($this->registry->db,$this->config);
+        if ($method==='POST' && $path==='/api/account/password') {
+            $accounts->changePassword($this->registry->actor,$this->input());$this->json(['saved'=>true]);
+        }
+        if ($method==='POST' && $path==='/api/team') {$this->json($accounts->manage($this->registry->actor,$this->input()));}
+        if ($method==='POST' && preg_match('~^/api/notifications/([a-f0-9]{32})/retry$~',$path,$m)) {
+            $job=Database::run($this->registry->db,'SELECT community_id FROM mail_outbox WHERE id=?',[$m[1]])->fetch();
+            if (!$job) {throw new Problem('NOT_FOUND','Notification not found.',404);}
+            $accounts->community($this->registry->actor,$job['community_id'],true);
+            $mail=new Mailbox($this->registry->db,$this->config);
+            if (!$mail->enabled()) {throw new Problem('EMAIL_DISABLED','Email delivery is disabled. Configure the mailbox first.',409);}
+            if (!$mail->deliver($m[1])) {throw new Problem('EMAIL_FAILED','Delivery did not complete. Check the mailbox settings or retry limit.',409);}
+            $this->json(['saved'=>true]);
+        }
+        if ($method==='POST' && preg_match('~^/api/requests/([^/]+)/link$~',$path,$m)) {
+            $r=Database::run($this->registry->db,'SELECT story_id FROM permission_requests WHERE id=?',[$m[1]])->fetch();
+            if (!$r) {throw new Problem('NOT_FOUND','Request not found.',404);}
+            $this->registry->privateStory($r['story_id'],true);
+            $this->json(['trackingUrl'=>(new RequestUpdates($this->registry->db,$this->config))->link($m[1])]);
+        }
+        if ($method==='PATCH' && preg_match('~^/api/stories/([^/]+)/edit$~',$path,$m)) {$this->json((new StoryChanges($this->registry))->update($m[1],$this->input()));}
+        if ($method==='GET' && preg_match('~^/api/steward/stories/([^/]+)/history$~',$path,$m)) {$this->json((new StoryChanges($this->registry))->history($m[1]));}
+        if ($method === 'POST'  && $path === '/api/stories') {
             $story = $this->registry->create($this->input(), $_FILES['media'] ?? null);
             $this->json(['id' => $story['id']], 201);
         }
@@ -253,7 +287,7 @@ final class Web
             $this->json($this->registry->ledger(isset($_GET['storyId']) && is_string($_GET['storyId']) ? $_GET['storyId'] : null));
         }
         if ($method === 'GET' && preg_match('~^/api/steward/stories/([^/]+)$~', $path, $m)) {
-            $this->json($this->registry->story($m[1]));
+            $this->json($this->registry->privateStory($m[1]));
         }
         if ($method === 'PATCH' && preg_match('~^/api/stories/([^/]+)/(consent|status)$~', $path, $m)) {
             if ($m[2] === 'consent') {
@@ -304,7 +338,13 @@ final class Web
         $t = Copy::text(...);
         $money = self::money(...);
         $csrf = $_SESSION['csrf'];
-        $signedIn = !empty($_SESSION['steward']);
+        $actor=$this->registry->actor??[];
+        $signedIn = !empty($actor['id']);
+        $communities=$signedIn ? (new Accounts($this->registry->db,$this->config))->communities($actor) : [];
+        $adminCommunities=$signedIn ? (new Accounts($this->registry->db,$this->config))->adminCommunities($actor) : [];
+        $canEdit=fn(string $id):bool=>$this->registry->canWriteStory($id);
+        $writeCommunities=$signedIn ? (new Accounts($this->registry->db,$this->config))->communities($actor,true) : [];
+        $canWrite=isset($data['story']) ? in_array($data['story']['communityId']??'',array_column($writeCommunities,'id'),true) : $writeCommunities!==[];
         extract($data, EXTR_SKIP);
         require dirname(__DIR__) . '/templates/layout.php';
     }

@@ -4,6 +4,33 @@ namespace Passport;
 
 final class Registry
 {
+    /** Null is reserved for trusted CLI jobs. Web requests always set an actor. */
+    public ?array $actor = null;
+
+    public function authorizeCommunity(string $id, bool $write = false): void
+    {
+        if ($this->actor !== null) {(new Accounts($this->db,$this->config))->community($this->actor,$id,$write);}
+    }
+
+    public function privateStory(string $id, bool $write = false): array
+    {
+        $story=$this->story($id);$this->authorizeCommunity($story['communityId'],$write);return $story;
+    }
+
+    public function canWriteStory(string $id): bool
+    {
+        if ($this->actor===null) {return true;}
+        $s=$this->story($id);
+        return in_array($s['communityId'],array_column((new Accounts($this->db,$this->config))->communities($this->actor,true),'id'),true);
+    }
+
+    private function visibleToActor(string $id): bool
+    {
+        if ($this->actor===null) {return true;}
+        $row=$this->query('SELECT community_id FROM stories WHERE id=?',[$id])->fetch();
+        return $row && in_array($row['community_id'],array_column((new Accounts($this->db,$this->config))->communities($this->actor),'id'),true);
+    }
+
     public function __construct(public readonly \PDO $db, private readonly array $config) {}
 
     private function query(string $sql, array $params = []): \PDOStatement
@@ -13,6 +40,10 @@ final class Registry
 
     public function create(array $data, ?array $file = null, ?string $creatorId = null): array
     {
+        $community=$data['communityId']??Accounts::DEFAULT_COMMUNITY;
+        if (!is_string($community)) {throw new Problem('VALIDATION','Choose a community.');}
+        $this->authorizeCommunity($community,true);
+        if ($this->actor!==null && $creatorId!==null) {throw new Problem('FORBIDDEN','Existing creators cannot be linked through this interface.',403);}
         $title = Input::text($data, 'title');
         $type = Input::choice($data, 'mediaType', ['text', 'image', 'audio', 'video']);
         $language = Input::text($data, 'language', 100);
@@ -89,6 +120,7 @@ final class Registry
                     }
                 }
             }
+            $this->query('UPDATE stories SET community_id=? WHERE id=?',[$community,$id]);
             foreach ($contributors as $person) {
                 $this->query('INSERT INTO contributors VALUES(?,?,?,?,?)', [$person['id'], $id, $person['name'], $person['role'], (int) $person['fund']]);
                 foreach ($person['consents'] as $purpose => $granted) {
@@ -99,6 +131,7 @@ final class Registry
             foreach ($shares as $share) {
                 $this->query('INSERT INTO split_shares VALUES(?,?,?)', [$id, $share['contributorId'], $share['bps']]);
             }
+            (new StoryChanges($this))->capture($id,'Initial registration claim.');
             $this->db->commit();
             return $this->story($id);
         } catch (\Throwable $e) {
@@ -112,7 +145,7 @@ final class Registry
 
     public function story(string $id): array
     {
-        $r = $this->query('SELECT s.*, c.name AS creator_name,c.type AS creator_type,c.representative_name FROM stories s JOIN creators c ON c.id=s.creator_id WHERE s.id=?', [$id])->fetch();
+        $r = $this->query('SELECT s.*, c.name AS creator_name,c.type AS creator_type,c.representative_name,g.name AS community_name FROM stories s JOIN creators c ON c.id=s.creator_id JOIN communities g ON g.id=s.community_id WHERE s.id=?', [$id])->fetch();
         if (!$r) {
             throw new Problem('NOT_FOUND', 'Story not found.', 404);
         }
@@ -128,6 +161,7 @@ final class Registry
         $shares = array_map(static fn(array $s): array => ['contributorId' => $s['contributor_id'], 'bps' => (int) $s['bps']], $this->query('SELECT * FROM split_shares WHERE story_id=? ORDER BY contributor_id', [$id])->fetchAll());
         return [
             'id' => $r['id'], 'title' => $r['title'], 'creatorId' => $r['creator_id'],
+            'communityName'=>$r['community_name'], 'communityId'=>$r['community_id'], 'sharingState'=>$r['sharing_state'], 'revision'=>(int)$r['revision'], 'preferredCredit'=>$r['preferred_credit'], 'updatedAt'=>$r['updated_at'] ? $this->date($r['updated_at']) : null,
             'creator' => ['name' => $r['creator_name'], 'type' => $r['creator_type'], 'representativeName' => $r['representative_name']],
             'mediaType' => $r['media_type'], 'textBody' => $r['text_body'], 'filePath' => $r['file_path'], 'mimeType' => $r['mime_type'],
             'language' => $r['language'], 'placeCoarse' => $r['place_coarse'], 'contextNote' => $r['context_note'],
@@ -145,6 +179,7 @@ final class Registry
     public function stories(bool $private = false): array
     {
         $rows = $this->query('SELECT id FROM stories ORDER BY created_at DESC')->fetchAll();
+        if ($private) {$rows=array_values(array_filter($rows,fn(array $r): bool=>$this->visibleToActor($r['id'])));}
         return array_map(fn(array $r): array => $private ? $this->story($r['id']) : Rules::publicStory($this->story($r['id'])), $rows);
     }
 
@@ -156,8 +191,8 @@ final class Registry
         }
         $this->db->beginTransaction();
         try {
-            $this->query('SELECT id FROM stories WHERE id=? FOR UPDATE', [$id]);
-            $story = $this->story($id);
+            $changes=new StoryChanges($this);
+            $story = $changes->begin($id,$data);
             $ids = array_column($story['contributors'], 'id');
             foreach ($updates as $update) {
                 if (!is_array($update) || !in_array($update['contributorId'] ?? null, $ids, true)) {
@@ -170,6 +205,7 @@ final class Registry
                 $granted = Input::bool($update, 'granted');
                 $this->query('INSERT INTO consents(contributor_id,purpose,granted,recorded_at) VALUES(?,?,?,UTC_TIMESTAMP(6))', [$update['contributorId'], $purpose, (int) $granted]);
             }
+            $changes->finish($id,$data,'Declared consent updated.');
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollBack();
@@ -180,8 +216,12 @@ final class Registry
     public function status(string $id, array $data): void
     {
         $status = Input::choice($data, 'status', ['UNVERIFIED', 'AUTHOR_REVIEWED', 'COMMUNITY_ENDORSED']);
-        $this->story($id);
-        $this->query('UPDATE stories SET status=? WHERE id=?', [$status, $id]);
+        $this->db->beginTransaction();
+        try {
+            $changes=new StoryChanges($this);$changes->begin($id,$data);
+            $this->query('UPDATE stories SET status=? WHERE id=?', [$status, $id]);
+            $changes->finish($id,$data,'Declared review updated.',false);$this->db->commit();
+        } catch (\Throwable $e) {$this->db->rollBack();throw $e;}
     }
 
     public function request(string $storyId, array $data): array
@@ -195,19 +235,28 @@ final class Registry
         $fee = Input::money($data, 'proposedFeeMinor');
         $currency = Input::currency($data);
         $id = bin2hex(random_bytes(16));
-        $this->query('INSERT INTO permission_requests(id,story_id,requester_name,requester_contact,intended_use,is_commercial,is_ai_training,proposed_fee_minor,currency,created_at) VALUES(?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP(6))', [$id, $storyId, $name, $contact, $use, (int) $commercial, (int) $ai, $fee, $currency]);
-        // Public acknowledgement intentionally does not echo private requester data.
-        return ['id' => $id, 'status' => 'PENDING', 'aiFlag' => $ai];
+        $this->db->beginTransaction();
+        try {
+            $this->query('SELECT id FROM stories WHERE id=? FOR UPDATE',[$storyId]);
+            if ($this->story($storyId)['sharingState']!=='ACTIVE') {throw new Problem('SHARING_PAUSED','The steward has paused new permission requests for this record.',409);}
+            $counts=$this->query('SELECT COUNT(*) AS total,SUM(requester_contact=?) AS personal FROM permission_requests WHERE story_id=? AND created_at>DATE_SUB(UTC_TIMESTAMP(),INTERVAL 1 DAY)',[$contact,$storyId])->fetch();
+            if ((int)$counts['total']>=40 || (int)$counts['personal']>=5) {throw new Problem('RATE_LIMIT','Please wait before sending another request for this story.',429);}
+            $this->query('INSERT INTO permission_requests(id,story_id,requester_name,requester_contact,intended_use,is_commercial,is_ai_training,proposed_fee_minor,currency,email_updates,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP(6))', [$id, $storyId, $name, $contact, $use, (int) $commercial, (int) $ai, $fee, $currency,(int)Input::bool($data,'emailUpdates')]);
+            $updates=new RequestUpdates($this->db,$this->config);$link=$updates->link($id);$updates->event($id,'PENDING');
+            $this->db->commit();
+        } catch (\Throwable $e) {$this->db->rollBack();throw $e;}
+        $updates->dispatch($id);
+        return ['id' => $id, 'status' => 'PENDING', 'aiFlag' => $ai,'trackingUrl'=>$link,'emailDelivery'=>(new Mailbox($this->db,$this->config))->enabled()?'queued':'disabled'];
     }
 
     public function requests(): array
     {
-        return array_map(fn(array $r): array => $this->mapRequest($r), $this->query('SELECT * FROM permission_requests ORDER BY created_at DESC')->fetchAll());
+        return array_map(fn(array $r): array => $this->mapRequest($r), array_values(array_filter($this->query('SELECT * FROM permission_requests ORDER BY created_at DESC')->fetchAll(),fn(array $r):bool=>$this->visibleToActor($r['story_id']))));
     }
 
     private function mapRequest(array $r): array
     {
-        return ['id' => $r['id'], 'storyId' => $r['story_id'], 'requesterName' => $r['requester_name'], 'requesterContact' => $r['requester_contact'], 'intendedUse' => $r['intended_use'], 'isCommercial' => (bool) $r['is_commercial'], 'isAiTraining' => (bool) $r['is_ai_training'], 'proposedFeeMinor' => $r['proposed_fee_minor'] === null ? null : (int) $r['proposed_fee_minor'], 'currency' => $r['currency'], 'status' => $r['status'], 'counterFeeMinor' => $r['counter_fee_minor'] === null ? null : (int) $r['counter_fee_minor'], 'finalFeeMinor' => $r['final_fee_minor'] === null ? null : (int) $r['final_fee_minor'], 'decisionNote' => $r['decision_note'], 'createdAt' => $this->date($r['created_at'])];
+        return ['counterResponse'=>$r['counter_response'],'counterReply'=>$r['counter_reply'],'counterVersion'=>(int)$r['counter_version'], 'id' => $r['id'], 'storyId' => $r['story_id'], 'requesterName' => $r['requester_name'], 'requesterContact' => $r['requester_contact'], 'intendedUse' => $r['intended_use'], 'isCommercial' => (bool) $r['is_commercial'], 'isAiTraining' => (bool) $r['is_ai_training'], 'proposedFeeMinor' => $r['proposed_fee_minor'] === null ? null : (int) $r['proposed_fee_minor'], 'currency' => $r['currency'], 'status' => $r['status'], 'counterFeeMinor' => $r['counter_fee_minor'] === null ? null : (int) $r['counter_fee_minor'], 'finalFeeMinor' => $r['final_fee_minor'] === null ? null : (int) $r['final_fee_minor'], 'decisionNote' => $r['decision_note'], 'createdAt' => $this->date($r['created_at'])];
     }
 
     public function decide(string $id, array $data): array
@@ -220,6 +269,9 @@ final class Registry
             if (!$raw) {
                 throw new Problem('NOT_FOUND', 'Request not found.', 404);
             }
+            // Acquire the story lock before any consistent read establishes a snapshot.
+            $this->query('SELECT id FROM stories WHERE id=? FOR UPDATE',[$raw['story_id']]);
+            $this->privateStory($raw['story_id'],true);
             $request = $this->mapRequest($raw);
             if ($request['status'] === 'APPROVED' && $decision === 'APPROVED') {
                 $this->db->commit();
@@ -237,7 +289,7 @@ final class Registry
             if ($decision === 'COUNTERED') {
                 $counter = Input::money($data, 'counterFeeMinor');
                 if ($counter === null) {
-                    throw new Problem('VALIDATION', 'Enter a MOCK counteroffer amount.');
+                    throw new Problem('VALIDATION', 'Enter a demo counteroffer amount.');
                 }
             }
             if ($decision === 'APPROVED') {
@@ -246,16 +298,17 @@ final class Registry
                     throw new Problem('CONSENT_BLOCKED', implode(' ', $reasons), 409, ['reasons' => $reasons]);
                 }
                 if (!Input::bool($data, 'feeConfirmed')) {
-                    throw new Problem('CONFIRMATION', 'Confirm the final MOCK fee before approval.');
+                    throw new Problem('CONFIRMATION', 'Confirm the final demo fee before approval.');
                 }
                 $fee = Input::money($data, 'finalFeeMinor');
                 if ($request['isCommercial'] && $fee === null) {
-                    throw new Problem('VALIDATION', 'Enter the final MOCK fee, including zero for no fee.');
+                    throw new Problem('VALIDATION', 'Enter the final demo fee, including zero for no fee.');
                 }
+                if ($request['counterResponse']==='ACCEPTED' && $fee!==$request['counterFeeMinor']) {throw new Problem('FEE_CHANGED','The final fee must match the accepted counteroffer. Send a new counteroffer to change it.',409);}
                 if (!$request['isCommercial'] && ($fee ?? 0) !== 0) {
                     throw new Problem('VALIDATION', 'A noncommercial request cannot produce a fee.');
                 }
-                $snapshot = json_encode(['license' => $story['license'], 'shares' => $story['shares'], 'consents' => $story['contributors'], 'finalFeeMinor' => $fee, 'currency' => $request['currency']], JSON_THROW_ON_ERROR);
+                $snapshot = json_encode(['revision'=>$story['revision'],'storyTitle'=>$story['title'],'license' => $story['license'], 'shares' => $story['shares'], 'consents' => $story['contributors'], 'finalFeeMinor' => $fee, 'currency' => $request['currency']], JSON_THROW_ON_ERROR);
                 if ($request['isCommercial']) {
                     foreach (Rules::allocate($fee, $story['shares']) as $person => $amount) {
                         $this->query('INSERT INTO ledger_entries(id,story_id,permission_req_id,contributor_id,amount_minor,currency,kind,payment_key,note,created_at) VALUES(?,?,?,?,?,?,\'MOCK_PAYMENT\',?,?,UTC_TIMESTAMP(6))', [bin2hex(random_bytes(16)), $story['id'], $id, $person, $amount, $request['currency'], $id . ':' . $person, 'MOCK allocation for approved use']);
@@ -263,7 +316,10 @@ final class Registry
                 }
             }
             $this->query('UPDATE permission_requests SET status=?,counter_fee_minor=?,decision_note=?,final_fee_minor=?,approval_snapshot=?,decided_at=UTC_TIMESTAMP(6) WHERE id=?', [$decision, $counter, $note, $fee, $snapshot, $id]);
+            if ($decision==='COUNTERED') {$this->query('UPDATE permission_requests SET counter_response=NULL,counter_reply=NULL,counter_version=counter_version+1 WHERE id=?',[$id]);}
+            $updates=new RequestUpdates($this->db,$this->config);$updates->event($id,$decision,$note);
             $this->db->commit();
+            $updates->dispatch($id);
             return ['id' => $id, 'status' => $decision];
         } catch (\Throwable $e) {
             $this->db->rollBack();
@@ -275,6 +331,8 @@ final class Registry
     {
         $where = $storyId ? ' WHERE e.story_id=?' : '';
         $entries = $this->query('SELECT e.*,c.name AS contributor_name FROM ledger_entries e JOIN contributors c ON c.id=e.contributor_id' . $where . ' ORDER BY e.created_at DESC,e.id', $storyId ? [$storyId] : [])->fetchAll();
+        $entries=array_values(array_filter($entries,fn(array $r):bool=>$this->visibleToActor($r['story_id'])));
+        if ($storyId) {$this->privateStory($storyId);}
         $balances = [];
         $totals = [];
         foreach ($entries as &$entry) {
@@ -292,12 +350,13 @@ final class Registry
         $amount = Input::money($data, 'amountMinor', true);
         $note = Input::text($data, 'note', 2000);
         if ($amount === null || $amount === 0) {
-            throw new Problem('VALIDATION', 'Enter a nonzero signed MOCK adjustment.');
+            throw new Problem('VALIDATION', 'Enter a nonzero signed demo adjustment.');
         }
         $entry = $this->query('SELECT * FROM ledger_entries WHERE id=?', [$entryId])->fetch();
         if (!$entry) {
             throw new Problem('NOT_FOUND', 'Entry not found.', 404);
         }
+        $this->privateStory($entry['story_id'],true);
         $id = bin2hex(random_bytes(16));
         $this->query('INSERT INTO ledger_entries(id,story_id,permission_req_id,contributor_id,amount_minor,currency,kind,original_entry_id,note,created_at) VALUES(?,?,?,?,?,?,\'MOCK_ADJUSTMENT\',?,?,UTC_TIMESTAMP(6))', [$id, $entry['story_id'], $entry['permission_req_id'], $entry['contributor_id'], $amount, $entry['currency'], $entryId, $note]);
         return ['id' => $id];
@@ -313,15 +372,17 @@ final class Registry
 
     public function claims(): array
     {
-        return $this->query('SELECT * FROM claims ORDER BY created_at DESC')->fetchAll();
+        return array_values(array_filter($this->query('SELECT * FROM claims ORDER BY created_at DESC')->fetchAll(),fn(array $r):bool=>$this->visibleToActor($r['story_id'])));
     }
 
     public function resolve(string $id, array $data): void
     {
         $status = Input::choice($data, 'status', ['OPEN', 'RESOLVED']);
-        if (!$this->query('SELECT id FROM claims WHERE id=?', [$id])->fetch()) {
+        $claim=$this->query('SELECT story_id FROM claims WHERE id=?',[$id])->fetch();
+        if (!$claim) {
             throw new Problem('NOT_FOUND', 'Claim not found.', 404);
         }
+        $this->privateStory($claim['story_id'],true);
         $this->query('UPDATE claims SET status=? WHERE id=?', [$status, $id]);
     }
 }

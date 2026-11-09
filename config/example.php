@@ -11,4 +11,15 @@ return [
     'steward_password_hash' => '',
     'storage_path' => dirname(__DIR__) . '/storage',
     'allow_demo_reset' => false,
+    // Enter the exact SMTP server from your Xneelo mailbox settings.
+    // Keep disabled until credentials are entered; never commit local.php.
+    'mail' => [
+        'transport' => 'disabled', // 'smtp' to enable; 'spool' is local testing only
+        'from' => 'steward@okwethu.wilmans.co.za',
+        'host' => '',
+        'port' => 465,
+        'encryption' => 'smtps', // alternatively starttls on 587
+        'username' => 'steward@okwethu.wilmans.co.za',
+        'password' => '',
+    ],
 ];

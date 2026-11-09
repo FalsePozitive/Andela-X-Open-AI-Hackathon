@@ -42,6 +42,7 @@ final class Demo
         $data['license']['preset'] = 'FREE_WITH_CREDIT';
         $picture = $registry->create($data);
         Database::run($registry->db, 'UPDATE stories SET media_type=\'image\',text_body=NULL,file_path=?,mime_type=?,content_hash=? WHERE id=?', [$media['filePath'], $media['mimeType'], $media['contentHash'], $picture['id']]);
+        Database::run($registry->db,'UPDATE story_revisions SET snapshot=? WHERE story_id=? AND revision=1',[json_encode($registry->story($picture['id']),JSON_THROW_ON_ERROR),$picture['id']]);
         $data = self::payload('Private placeholder title');
         $data['creator'] = ['type' => 'COMMUNITY', 'name' => 'Demo Story Group (fictional)', 'representativeName' => 'Demo Representative B'];
         $data['sensitivity'] = 'RESTRICTED';

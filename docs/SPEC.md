@@ -54,3 +54,6 @@ Target subdomain: https://okwethu.wilmans.co.za. Hosted access and provider-spec
 
 See [Passport/media exports](PASSPORT-EXPORTS.md) for percentage inputs, QR-marked downloads and branded PDFs. No database migration is required.
 
+
+## Community tools extension
+User-approved features 1, 3, 4, 5, 6 and 7 add private revisions, sharing states and publication-consent gates, request capability links and counter replies, optional SMTP outbox delivery, database accounts and scoped memberships, safe search and preferred attribution. Schema: database/migrations/002_community_tools.sql. See [Community tools](COMMUNITY-TOOLS.md) for behavior, ownership overrides, upgrade and verification. Existing financial rows and approval snapshots remain unchanged.

@@ -121,6 +121,10 @@ final class Web
             }
             if ($path === '/') {
                 $this->page('home', ['stories' => $this->registry->stories()]);
+            } elseif ($path === '/about') {
+                $this->page('about');
+            } elseif ($path === '/faq') {
+                $this->page('faq');
             } elseif ($path === '/login') {
                 $this->page('login');
             } elseif (preg_match('~^/p/([A-Z2-9]{4}-[A-Z2-9]{4})$~', $path, $m)) {

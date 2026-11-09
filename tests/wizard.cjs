@@ -21,10 +21,11 @@ const crypto = require('crypto');
   next();assert.equal(step(),'2');assert.equal(document.querySelector('[name="aiTrainingAllowed"]').checked,false,'AI defaults off');
   fill('contactEmail','steward@example.com');next();assert.equal(step(),'2','Terms confirmation is mandatory');document.querySelector('[name="termsConfirmed"]').checked=true;next();assert.equal(step(),'3');
   let shares=document.querySelectorAll('#shares input');shares[0].value='7000';shares[0].dispatchEvent(new window.Event('input'));shares[1].value='3000';shares[1].dispatchEvent(new window.Event('input'));
-  fill('sampleAmount','7');assert.match(document.querySelector('#split-preview').textContent,/MOCK 5 minor units/);assert.match(document.querySelector('#split-preview').textContent,/MOCK 2 minor units/);
+  fill('sampleAmount','7');assert.match(document.querySelector('#split-preview').textContent,/Demo 5 minor units/);assert.match(document.querySelector('#split-preview').textContent,/Demo 2 minor units/);
   next();assert.equal(step(),'3','Shares confirmation is mandatory');document.querySelector('[name="sharesConfirmed"]').checked=true;next();assert.equal(step(),'4');assert.match(document.querySelector('#review').textContent,/Demo Contributor/);assert.match(document.querySelector('#review').textContent,/COMMERCIAL/);
   document.querySelector('#previous').click();assert.equal(step(),'3');assert.equal(document.querySelectorAll('#shares input')[0].value,'7000','Back navigation preserves shares');next();
   document.querySelector('#story-form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(resolve=>setTimeout(resolve,0));
   assert.ok(captured,'Wizard submitted');assert.equal(captured.url,'/api/stories');assert.equal(captured.payload.contributors.length,2);assert.equal(captured.payload.contributors[0].bps,7000);assert.equal(captured.payload.contributors[0].consents.COMMERCIAL,true);assert.equal(captured.payload.contributors[0].consents.AI_TRAINING,false);assert.equal(captured.payload.termsConfirmed,true);assert.equal(captured.payload.sharesConfirmed,true);assert.equal(errors.length,0,errors.map(error=>error.message).join('\n'));
   console.log('Wizard DOM checks passed: validation, consent, terms, calculator, review, back navigation, submission.');dom.window.close();
 })().catch(error=>{console.error(error);process.exitCode=1;});
+

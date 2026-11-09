@@ -43,7 +43,7 @@ Build the screens people actually see: the public Passport, the creation flow, a
    4. Revenue split with a live **split calculator**: enter a sample amount, see per-share payouts, and block submit unless shares sum to 100%
    5. Review and publish, with a link to the new Passport
 3. **Requests inbox `/dashboard/requests`:** list of pending requests; Approve / Decline / Counter. If approval is blocked, show the reasons from the API plainly. Show the AI-training warning when flagged.
-4. **Ledger dashboard `/ledger`:** balances per contributor, transaction list, totals. Every payment row shows a **MOCK** tag. A simple bar or list visualization is enough.
+4. **Ledger dashboard `/ledger`:** balances per contributor, transaction list, totals. Every payment amount shows a **Demo** label, with a visible no-real-money notice. A simple bar or list visualization is enough.
 5. **Polish:** loading and empty states, error messages, print-friendly Passport.
 
 ## Rules
@@ -65,5 +65,6 @@ Build the screens people actually see: the public Passport, the creation flow, a
 
 ## Approved implementation update
 PHP 8.3 / MySQL replaces Next.js / SQLite. See docs/SPEC.md for the authoritative PHP paths, API, privacy and rounding decisions. Role ownership is retained by subsystem; the initial integrated build spans all roles under the user-approved plan.
+
 
 

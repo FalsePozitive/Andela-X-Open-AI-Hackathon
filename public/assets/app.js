@@ -75,7 +75,7 @@ if (wizard) {
     let remainder = amount - [...allocations.values()].reduce((a,b) => a+b,0);
     const ranked = [...list].sort((a,b) => b.bps-a.bps || list.indexOf(a)-list.indexOf(b));
     for (const person of ranked) { if (remainder && person.bps > 0) {allocations.set(person.key,allocations.get(person.key)+1); remainder--;} }
-    for (const p of list) {const line = document.createElement('p'); line.textContent = `${p.name}: MOCK ${allocations.get(p.key)} ${messages.minorUnits}`; preview.append(line);}
+    for (const p of list) {const line = document.createElement('p'); line.textContent = `${p.name}: ${messages.amountLabel} ${allocations.get(p.key)} ${messages.minorUnits}`; preview.append(line);}
     const note = document.createElement('small'); note.textContent = messages.previewNote; preview.append(note);
   }
   function shareFields() {

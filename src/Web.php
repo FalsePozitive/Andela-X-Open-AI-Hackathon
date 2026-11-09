@@ -17,7 +17,7 @@ final class Web
     public static function money(int $minor, string $currency): string
     {
         $absolute = abs($minor);
-        return 'MOCK ' . $currency . ' ' . ($minor < 0 ? '-' : '') . intdiv($absolute, 100) . '.' . str_pad((string) ($absolute % 100), 2, '0', STR_PAD_LEFT);
+        return 'Demo · ' . $currency . ' ' . ($minor < 0 ? '-' : '') . intdiv($absolute, 100) . '.' . str_pad((string) ($absolute % 100), 2, '0', STR_PAD_LEFT);
     }
 
     public function steward(): void

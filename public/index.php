@@ -9,5 +9,5 @@ try {
     http_response_code(503);
     header('Content-Type: text/plain; charset=utf-8');
     header('Cache-Control: no-store');
-    echo 'Story Passport is being prepared. Please check back shortly.';
+    echo 'Okwethu is being prepared. Please check back shortly.';
 }

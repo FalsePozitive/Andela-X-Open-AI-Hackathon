@@ -18,7 +18,7 @@ One-line pitch: *Every African story gets a passport that says whose it is, what
 These override convenience. If a task conflicts with them, stop and flag it.
 
 1. **Be honest about what this is.** Licenses and consent records are *declared terms*, not legally enforceable contracts. The registry records who *claimed* a story and when; it does not prove ownership. Never write UI copy, comments, or docs that imply legal enforcement, guaranteed protection, or verified ownership.
-2. **Payments are mock only.** No real money, no payment provider SDKs, no real bank or mobile-money details. Every ledger payment is labeled "MOCK" in the UI.
+2. **Payments are mock only.** No real money, no payment provider SDKs, no real bank or mobile-money details. Every ledger amount is clearly labeled "Demo", with "no real money moves" visible on payment screens. Internal MOCK_PAYMENT/MOCK_ADJUSTMENT values remain unchanged.
 3. **Consent is specific.** Consent is stored per person and per purpose (record, publish, translate, commercial, AI training). Never collapse it into a single boolean.
 4. **The community decides.** Rights terms and splits are set by creators/community representatives. The system suggests defaults but never silently applies them.
 5. **Sensitive stories stay protected.** A story marked `restricted` must not expose its content, audio, or location publicly. The passport shows only that it exists, who stewards it, and how to contact them.
@@ -109,4 +109,8 @@ Real payments, blockchain, real identity verification, user accounts beyond a si
 The original commands and Next.js layout above are superseded by README.md and docs/SPEC.md. Use src/ for pure rules and services, templates/ for pages, public/ as the only web root, database/migrations/ for SQL, and src/Demo.php for seed data. Current checks: php bin/console.php lint; php vendor/phpunit/phpunit/phpunit; php vendor/phpstan/phpstan/phpstan analyse; npm run build. The integrated initial implementation spans all ownership areas. No real payments, no identity verification, and no claims of enforceability.
 
 
+
+
+## Okwethu visual update
+User-approved name: Okwethu (Ours). Goldenrod #DAA520 is the primary brand colour. Public copy uses Demo instead of MOCK while clearly identifying simulated payments. The rebrand spans frontend, copy and amount formatting; it changes no financial or consent behavior.
 

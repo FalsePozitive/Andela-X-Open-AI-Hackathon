@@ -1,1 +1,1 @@
-module.exports = {content: ['./templates/**/*.php', './public/assets/app.js'], theme: {extend: {colors: {ink:'#163b38', cream:'#f6f3ea', clay:'#a4442e', moss:'#315f4a'}}}, plugins: []};
+module.exports = {content: ['./templates/**/*.php', './public/assets/app.js'], theme: {extend: {colors: {ink:'#332513', cream:'#FFFBF1', clay:'#C97816', moss:'#79500E', goldenrod:'#DAA520', ochre:'#B3841A', amber:'#EF9521', apricot:'#FFB248', honey:'#FFD27F', bronze:'#8A5E10', palegold:'#FFEAAB'}}}, plugins: []};

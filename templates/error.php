@@ -1,0 +1,1 @@
+<section class="narrow card"><p class="eyebrow"><?= $e($t('PLEASE CHECK')) ?></p><h1><?= $e($t('We could not complete that.')) ?></h1><p role="alert"><?= $e($message) ?></p><a class="button" href="/"><?= $e($t('Back to passports')) ?></a><a href="/login"><?= $e($t('login')) ?></a></section>

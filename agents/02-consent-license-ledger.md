@@ -8,28 +8,28 @@ Own the rules that make this project trustworthy: consent, license terms, permis
 
 ## You own
 
-- `/lib/consent.ts`
-- `/lib/license.ts`
-- `/lib/ledger.ts`
-- `/app/api/requests/**`, `/app/api/ledger/**`, `/app/api/stories/[id]/requests/**`
-- Unit tests for all of the above (`/lib/*.test.ts`)
+- `/src/Rules.php`
+- `/src/Rules.php`
+- `/src/Rules.php and /src/Registry.php`
+- `/src/Web.php and /src/Registry.php`, `/src/Web.php and /src/Registry.php`, `/src/Web.php and /src/Registry.php`
+- Unit tests for all of the above (`/tests/*Test.php`)
 
 ## Tasks (in order)
 
-1. **Split validation (`ledger.ts`):**
+1. **Split validation (`ledger.php`):**
    - `validateSplit(shares)` returns ok only if every `bps` is a non-negative integer and the sum equals exactly 10000.
    - `allocate(amountMinor, shares)` returns per-share amounts as integers whose sum equals `amountMinor` exactly. Rule: `floor(amount * bps / 10000)` per share, and any remainder is distributed one minor unit at a time starting from the largest share. Document the rule in a comment.
    - Property-style tests: random splits and amounts always sum correctly; no negative values.
 2. **Balances:** `computeBalances(entries)` groups append-only ledger entries by contributor.
-3. **Consent rules (`consent.ts`):**
+3. **Consent rules (`consent.php`):**
    - `canApprove(request, contributors, consents, license)` returns `{ ok, reasons[] }`.
    - Commercial requests require every contributor to have granted `COMMERCIAL`.
    - Any request flagged as AI training requires `license.aiTrainingAllowed === true` and every contributor to have granted `AI_TRAINING`.
    - Return human-readable reasons so the UI can explain why approval is blocked.
 4. **AI-training detection:** `detectAiTrainingIntent(text)` is a simple keyword/phrase check on `intendedUse` ("train", "training data", "dataset", "fine-tune", "LLM", "model"). It is a **conservative flag, not a verdict**: on a match, the UI shows "This request may involve AI training. Review carefully." Document its limits in a comment.
-5. **License text (`license.ts`):** `describeLicense(preset, aiTrainingAllowed)` returns plain-language bullets (what is allowed, what needs permission, what is never allowed). No legal jargon. Never use phrases like "legally binding" or "enforceable".
+5. **License text (`license.php`):** `describeLicense(preset, aiTrainingAllowed)` returns plain-language bullets (what is allowed, what needs permission, what is never allowed). No legal jargon. Never use phrases like "legally binding" or "enforceable".
 6. **Request endpoints:**
-   - `POST /api/stories/:id/requests` creates a request (validate with Zod).
+   - `POST /api/stories/:id/requests` creates a request (validate with PHP Input validators).
    - `PATCH /api/requests/:id` lets the demo steward approve, decline, or counter. On approve, call `canApprove`; if blocked, return 409 with reasons.
    - On approve of a commercial request with a fee, create one `LedgerEntry` per split share via `allocate`, in a single transaction. Entries are `MOCK_PAYMENT`.
    - Approval is idempotent: approving twice must not create duplicate entries.
@@ -48,10 +48,16 @@ Own the rules that make this project trustworthy: consent, license terms, permis
 - Approving a request with a fee creates entries that sum exactly to the fee
 - Double approval creates no duplicates
 - Blocked approvals return clear reasons
-- `npm run lint` and `npm test` pass
+- `php bin/console.php lint` and `php vendor/phpunit/phpunit/phpunit` pass
 
 ## Hand-offs
 
 - Agent 01 calls `validateSplit` when creating stories.
 - Agent 03 displays your `reasons[]` and balances.
 - Agent 05 will try to break your rules. Expect it.
+
+
+## Approved implementation update
+PHP 8.3 / MySQL replaces Next.js / SQLite. See docs/SPEC.md for the authoritative PHP paths, API, privacy and rounding decisions. Role ownership is retained by subsystem; the initial integrated build spans all roles under the user-approved plan.
+
+

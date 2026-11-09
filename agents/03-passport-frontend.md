@@ -8,11 +8,11 @@ Build the screens people actually see: the public Passport, the creation flow, a
 
 ## You own
 
-- `/app/p/[storyId]/page.tsx` (public Passport)
-- `/app/dashboard/**` (create story, manage requests)
-- `/app/ledger/**` (Ledger dashboard)
-- `/components/**`
-- `/lib/copy.ts` (all user-facing strings)
+- `/templates/passport.php` (public Passport)
+- `/templates/{dashboard,new,manage,requests,claims}.php` (create story, manage requests)
+- `/templates/ledger.php` (Ledger dashboard)
+- `/templates/layout.php and /resources/app.css`
+- `/src/Copy.php and /resources/copy.php` (all user-facing strings)
 
 ## Design principles
 
@@ -48,7 +48,7 @@ Build the screens people actually see: the public Passport, the creation flow, a
 
 ## Rules
 
-- All strings come from `/lib/copy.ts`.
+- All strings come from `/src/Copy.php and /resources/copy.php`.
 - Never display contact details of contributors on public pages.
 - Never claim "verified" unless the status is actually `COMMUNITY_ENDORSED` or `AUTHOR_REVIEWED`, and label what that means.
 - Do not add heavy UI libraries. Tailwind plus simple components.
@@ -60,4 +60,10 @@ Build the screens people actually see: the public Passport, the creation flow, a
 - The Passport is readable on a 360px-wide screen
 - Restricted stories show the protected view
 - Keyboard-only navigation works for the main forms
-- `npm run lint` passes
+- `php bin/console.php lint` passes
+
+
+## Approved implementation update
+PHP 8.3 / MySQL replaces Next.js / SQLite. See docs/SPEC.md for the authoritative PHP paths, API, privacy and rounding decisions. Role ownership is retained by subsystem; the initial integrated build spans all roles under the user-approved plan.
+
+

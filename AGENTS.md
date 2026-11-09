@@ -28,12 +28,12 @@ These override convenience. If a task conflicts with them, stop and flag it.
 
 ## Stack
 
-- Next.js (App Router) + TypeScript
+- PHP 8.3 server-rendered templates and PHP routing
 - Tailwind CSS
-- Prisma + SQLite (file DB, hackathon scale)
-- `qrcode` for QR generation
-- Zod for input validation
-- Vitest for unit tests (ledger math, consent logic, license rules)
+- PDO + MySQL/MariaDB with versioned SQL migrations
+- `endroid/qr-code` for QR PNG generation
+- PHP Input validators for server-side validation
+- PHPUnit for unit/integration tests; PHPStan for static analysis
 
 Adjust the stack only if the team agrees; update this file if you do.
 
@@ -41,40 +41,38 @@ Adjust the stack only if the team agrees; update this file if you do.
 
 Update these if scripts change.
 
-```bash
-npm install
-npx prisma migrate dev      # create/update the local DB
-npm run seed                # load demo data (see agents/04-seed-and-demo.md)
-npm run dev                 # start the app on http://localhost:3000
-npm test                    # run unit tests
-npm run lint                # lint + typecheck
+```text
+composer install
+npm ci
+npm run build
+php bin/console.php migrate
+php bin/console.php seed
+php -S 127.0.0.1:8087 -t public public/router.php
+php vendor/phpunit/phpunit/phpunit
+php bin/console.php lint
+php vendor/phpstan/phpstan/phpstan analyse
 ```
 
 ## Repo layout
 
-```
-/app                 Next.js routes (UI + API route handlers)
-/app/p/[storyId]     Public Passport page
-/app/dashboard       Creator/community dashboard
-/app/ledger          Ledger dashboard
-/lib                 Pure logic: ledger math, consent rules, license rules, id generation
-/prisma              Schema + migrations + seed
-/components          Shared UI
-/agents              Role instructions for coding agents
-/docs                Spec and demo script
-```
+- src/: pure rules, validation, data and web services
+- templates/: server-rendered pages
+- public/: only web root; compiled assets
+- database/migrations/: versioned MySQL schema
+- agents/: role briefs; docs/: specification, demo and deployment
+- tests/: PHPUnit checks
 
-Keep business logic in `/lib` as pure, tested functions. Route handlers and components stay thin.
+Keep rules pure and controllers thin.
 
 ## Conventions
 
-- TypeScript strict mode. No `any` without a comment explaining why.
-- Validate every API input with Zod. Return typed errors with clear messages.
+- PHP strict types. Validate untrusted input at every boundary.
+- Validate every API input with the PHP Input validators. Return typed errors with clear messages.
 - **Money is stored as integers in minor units** (e.g., cents), never floats. Percentages are stored as integer basis points (1% = 100 bps; 100% = 10000 bps). Splits must always sum to exactly 10000 bps.
 - Story IDs are short, human-readable, URL-safe codes (e.g., `K7F2-9QXA`), generated without ambiguous characters (no 0/O, 1/I/l).
 - Dates are stored as UTC ISO strings and displayed in the viewer's locale.
 - Components are accessible: semantic HTML, labels on inputs, sufficient contrast, keyboard-navigable. Assume low-end phones and slow connections: mobile-first, minimal JS on the public passport page, no heavy images.
-- UI text is plain and warm. Avoid legal jargon. Keep strings in one place (`/lib/copy.ts`) so they can be translated later.
+- UI text is plain and warm. Avoid legal jargon. Keep strings in one place (`/src/Copy.php and /resources/copy.php`) so they can be translated later.
 - Commits are small and descriptive. One concern per commit.
 
 ## Definition of done (per task)
@@ -92,10 +90,10 @@ Each role owns specific files. Do not edit another role's files without noting i
 
 | Agent file | Owns |
 |---|---|
-| `agents/01-registry-backend.md` | `/prisma`, `/lib/ids`, story and creator API routes |
-| `agents/02-consent-license-ledger.md` | `/lib/consent`, `/lib/license`, `/lib/ledger`, related API routes and tests |
-| `agents/03-passport-frontend.md` | `/app/p`, `/app/dashboard`, `/app/ledger`, `/components` |
-| `agents/04-seed-and-demo.md` | `/prisma/seed`, `/docs/DEMO.md` |
+| `agents/01-registry-backend.md` | `/database`, `/src/Rules.php`, story and creator API routes |
+| `agents/02-consent-license-ledger.md` | `/src/Rules.php`, `/src/Rules.php`, `/src/Registry.php`, related API routes and tests |
+| `agents/03-passport-frontend.md` | `/templates/passport.php`, `/templates/`, `/templates/ledger.php`, `/resources` |
+| `agents/04-seed-and-demo.md` | `/database/seed`, `/docs/DEMO.md` |
 | `agents/05-qa-and-safety-review.md` | Reviews everything; owns tests for principles and edge cases |
 
 ## Build order
@@ -105,3 +103,10 @@ Follow `docs/SPEC.md` phases. Get an ugly end-to-end flow working by Phase 3, th
 ## Out of scope
 
 Real payments, blockchain, real identity verification, user accounts beyond a simple demo login, multi-language UI beyond a string table, legal advice, and any claim of enforceability.
+
+
+## Approved PHP build overrides
+The original commands and Next.js layout above are superseded by README.md and docs/SPEC.md. Use src/ for pure rules and services, templates/ for pages, public/ as the only web root, database/migrations/ for SQL, and src/Demo.php for seed data. Current checks: php bin/console.php lint; php vendor/phpunit/phpunit/phpunit; php vendor/phpstan/phpstan/phpstan analyse; npm run build. The integrated initial implementation spans all ownership areas. No real payments, no identity verification, and no claims of enforceability.
+
+
+

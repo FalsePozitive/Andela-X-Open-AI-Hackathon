@@ -1,0 +1,12 @@
+Options -Indexes -MultiViews
+Require all granted
+DirectoryIndex index.php
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [QSA,L]
+<FilesMatch "^\.">
+ Require all denied
+</FilesMatch>
+<Files "router.php">
+ Require all denied
+</Files>

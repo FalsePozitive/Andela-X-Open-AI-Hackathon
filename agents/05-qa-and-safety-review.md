@@ -71,3 +71,9 @@ Be the skeptic. Try to break the rules, find places where the UI over-claims, an
 - All checklist items pass or have a logged, accepted reason
 - Automated tests cover the rules and leak checks
 - `docs/REVIEW.md` shows no open blockers
+
+
+## Approved implementation update
+PHP 8.3 / MySQL replaces Next.js / SQLite. See docs/SPEC.md for the authoritative PHP paths, API, privacy and rounding decisions. Role ownership is retained by subsystem; the initial integrated build spans all roles under the user-approved plan.
+
+

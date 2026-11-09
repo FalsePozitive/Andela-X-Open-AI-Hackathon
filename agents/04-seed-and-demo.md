@@ -8,9 +8,9 @@ Make the demo reliable and honest. Provide seed data, a demo script, and a reset
 
 ## You own
 
-- `/prisma/seed.ts`
+- `/src/Demo.php`
 - `/docs/DEMO.md`
-- `npm run seed` and `npm run reset-demo` scripts
+- `php bin/console.php seed` and `php bin/console.php reset-demo --confirm=RESET-DEMO` scripts
 
 ## Tasks (in order)
 
@@ -26,8 +26,8 @@ Make the demo reliable and honest. Provide seed data, a demo script, and a reset
    - Do **not** invent or imitate real cultural traditions, proverbs, sacred stories, or named real communities.
    - Use clearly labeled placeholder stories (e.g., "Placeholder story: a market day") or public-domain/permissioned text, and mark them in the UI as demo data.
    - Use fictional names for people and organizations. Add a visible "Demo data" note in the seed story context.
-   - If the team has real, permissioned stories, they go in a separate `seed.local.ts` that is gitignored.
-3. **Reset command:** `npm run reset-demo` wipes the DB and reseeds.
+   - If the team has real, permissioned stories, they go in a separate `seed.local.php` that is gitignored.
+3. **Reset command:** `php bin/console.php reset-demo --confirm=RESET-DEMO` wipes the DB and reseeds.
 4. **Demo script (`docs/DEMO.md`):** a timed 3-minute walkthrough:
    1. Problem (20s)
    2. Create a story with consent and split (50s)
@@ -47,6 +47,12 @@ Make the demo reliable and honest. Provide seed data, a demo script, and a reset
 
 ## Done when
 
-- `npm run reset-demo` produces a clean demo state every time
+- `php bin/console.php reset-demo --confirm=RESET-DEMO` produces a clean demo state every time
 - The scripted demo can be run start to finish without errors
 - `docs/DEMO.md` includes the fallback plan and checklist
+
+
+## Approved implementation update
+PHP 8.3 / MySQL replaces Next.js / SQLite. See docs/SPEC.md for the authoritative PHP paths, API, privacy and rounding decisions. Role ownership is retained by subsystem; the initial integrated build spans all roles under the user-approved plan.
+
+

@@ -109,15 +109,9 @@ final class Web
                 if ($story['sensitivity'] === 'RESTRICTED' || !$story['filePath']) {
                     throw new Problem('NOT_FOUND', 'Media not available.', 404);
                 }
-                header('Content-Type: ' . $story['mimeType']);
-                $file = $this->config['storage_path'] . '/uploads/' . $story['filePath'];
-                if (!is_file($file)) {
-                    throw new Problem('NOT_FOUND', 'Media not available.', 404);
-                }
-                header('Content-Length: ' . filesize($file));
-                session_write_close();
-                readfile($file);
-                exit;
+                $file = $story['mediaType'] === 'image' ? Watermark::image($story, $this->config) : Watermark::original($story, $this->config);
+                $mime = $story['mediaType'] === 'image' ? 'image/png' : $story['mimeType'];
+                $this->file($file, $mime, 'okwethu-' . $story['id'] . ($story['mediaType'] === 'image' ? '.png' : ''), isset($_GET['download']));
             }
             if ($path === '/') {
                 $this->page('home', ['stories' => $this->registry->stories()]);
@@ -209,6 +203,26 @@ final class Web
 
     private function api(string $method, string $path): void
     {
+        if ($method === 'GET' && preg_match('~^/api/stories/([^/]+)/(pdf|cover|download)$~', $path, $m)) {
+            $story = $this->registry->story($m[1]);
+            if ($m[2] === 'pdf') {
+                $bytes = PassportPdf::render($story, $this->config);
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: attachment; filename="okwethu-passport-' . $story['id'] . '.pdf"');
+                header('Content-Length: ' . strlen($bytes));
+                echo $bytes; exit;
+            }
+            if ($m[2] === 'cover') {
+                $this->file(Watermark::cover($story, $this->config), 'image/png', 'okwethu-cover-' . $story['id'] . '.png', isset($_GET['download']));
+            }
+            if ($story['mediaType'] === 'image') {
+                $this->file(Watermark::image($story, $this->config), 'image/png', 'okwethu-' . $story['id'] . '.png', true);
+            }
+            if ($story['mediaType'] === 'audio') {
+                $this->file(Watermark::audioZip($story, $this->config), 'application/zip', 'okwethu-audio-' . $story['id'] . '.zip', true);
+            }
+            throw new Problem('NOT_FOUND', 'Use the passport’s video export button for a QR-marked video.', 404);
+        }
         if ($method === 'GET' && preg_match('~^/api/stories/([^/]+)/qr$~', $path, $m)) {
             $this->registry->story($m[1]);
             $png = (new PngWriter())->write(QrCode::create(rtrim($this->config['base_url'], '/') . '/p/' . $m[1])->setSize(300)->setMargin(16));
@@ -267,6 +281,15 @@ final class Web
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
         exit;
+    }
+
+    private function file(string $path, string $mime, string $name, bool $download): never
+    {
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: ' . ($download ? 'attachment' : 'inline') . '; filename="' . $name . '"');
+        header('Content-Length: ' . filesize($path));
+        if (session_status() === PHP_SESSION_ACTIVE) {session_write_close();}
+        readfile($path); exit;
     }
 
     private function redirect(string $path): never

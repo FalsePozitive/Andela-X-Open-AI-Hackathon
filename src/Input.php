@@ -4,6 +4,18 @@ namespace Passport;
 
 final class Input
 {
+    public static function percentage(mixed $value): int
+    {
+        if ((!is_string($value) && !is_int($value)) || !preg_match('/^\d{1,3}(?:\.\d{1,2})?$/', (string) $value)) {
+            throw new Problem('INVALID_SPLIT', 'Enter a percentage from 0 to 100 with up to two decimal places.');
+        }
+        $parts = explode('.', (string) $value);
+        $bps = (int) $parts[0] * 100 + (int) str_pad($parts[1] ?? '', 2, '0');
+        if ($bps > 10000) {
+            throw new Problem('INVALID_SPLIT', 'Each percentage must be between 0% and 100%.');
+        }
+        return $bps;
+    }
     public static function text(array $data, string $key, int $max = 200, bool $required = true): string
     {
         $value = $data[$key] ?? '';

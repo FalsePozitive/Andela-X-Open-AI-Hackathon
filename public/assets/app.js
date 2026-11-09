@@ -58,7 +58,8 @@ if (wizard) {
   const next = document.querySelector('#next');
   const previous = document.querySelector('#previous');
   const bps = new Map();
-  function people() { return [...contributors.querySelectorAll('.person')].map(p => ({key:p.dataset.key, name:p.querySelector('[data-name]').value, role:p.querySelector('[data-role]').value, isCommunityFund:p.querySelector('[data-fund]').checked, consents:Object.fromEntries([...p.querySelectorAll('[data-purpose]')].map(c => [c.dataset.purpose,c.checked])), bps:Number(bps.get(p.dataset.key) || 0)})); }
+  function scaledDecimal(value) {const text=String(value).trim();if(!/^\d+(?:\.\d{1,2})?$/.test(text))return NaN;const [whole,fraction='']=text.split('.');const result=Number(whole)*100+Number(fraction.padEnd(2,'0'));return Number.isSafeInteger(result)?result:NaN;}
+  function people() { return [...contributors.querySelectorAll('.person')].map(p => ({key:p.dataset.key, name:p.querySelector('[data-name]').value, role:p.querySelector('[data-role]').value, isCommunityFund:p.querySelector('[data-fund]').checked, consents:Object.fromEntries([...p.querySelectorAll('[data-purpose]')].map(c => [c.dataset.purpose,c.checked])), percentage:String(bps.get(p.dataset.key) || '0'), bps:scaledDecimal(bps.get(p.dataset.key) || '0')})); }
   function addPerson() {
     if (contributors.children.length >= 50) return;
     const fragment = document.querySelector('#person-template').content.cloneNode(true);
@@ -67,20 +68,20 @@ if (wizard) {
     contributors.append(fragment);
   }
   function splitPreview() {
-    const list = people(); const total = list.reduce((sum,p) => sum+p.bps,0); const amount = Number(wizard.elements.sampleAmount.value);
+    const list = people(); const total = list.reduce((sum,p) => sum+p.bps,0); const amount = scaledDecimal(wizard.elements.sampleAmount.value);
     preview.replaceChildren();
-    const summary = document.createElement('p'); summary.textContent = `${messages.total}: ${total.toLocaleString()} / 10,000 ${messages.basisPoints}`; summary.className = total === 10000 ? 'badge' : 'notice warning'; preview.append(summary);
+    const summary = document.createElement('p'); summary.textContent = `${messages.total}: ${Number.isFinite(total)?(total/100).toFixed(2):'—'}% / 100%`; summary.className = total === 10000 ? 'badge' : 'notice warning'; preview.append(summary);
     if (total !== 10000 || !Number.isSafeInteger(amount) || amount < 0 || amount > 1000000000 || list.some(p => !Number.isInteger(p.bps) || p.bps < 0)) return;
     const allocations = new Map(list.map(p => [p.key,Math.floor(amount*p.bps/10000)]));
     let remainder = amount - [...allocations.values()].reduce((a,b) => a+b,0);
     const ranked = [...list].sort((a,b) => b.bps-a.bps || list.indexOf(a)-list.indexOf(b));
     for (const person of ranked) { if (remainder && person.bps > 0) {allocations.set(person.key,allocations.get(person.key)+1); remainder--;} }
-    for (const p of list) {const line = document.createElement('p'); line.textContent = `${p.name}: ${messages.amountLabel} ${allocations.get(p.key)} ${messages.minorUnits}`; preview.append(line);}
+    for (const p of list) {const line = document.createElement('p'); line.textContent = `${p.name}: ${messages.amountLabel} ZAR ${(allocations.get(p.key)/100).toFixed(2)}`; preview.append(line);}
     const note = document.createElement('small'); note.textContent = messages.previewNote; preview.append(note);
   }
   function shareFields() {
     shares.replaceChildren();
-    for (const person of people()) {const label = document.createElement('label'); label.textContent = `${person.name} · ${messages.basisPoints}`; const input = document.createElement('input'); input.type='number'; input.min='0'; input.max='10000'; input.step='1'; input.required=true; input.value=String(bps.get(person.key)||0); input.addEventListener('input', () => {bps.set(person.key,input.value); splitPreview();}); label.append(input); shares.append(label);}
+    for (const person of people()) {const label = document.createElement('label'); label.textContent = `${person.name} · %`; const input = document.createElement('input'); input.type='number'; input.min='0'; input.max='100'; input.step='0.01'; input.required=true; input.value=String(bps.get(person.key)||0); input.addEventListener('input', () => {bps.set(person.key,input.value); splitPreview();}); label.append(input); shares.append(label);}
     splitPreview();
   }
   function show() {
@@ -88,9 +89,9 @@ if (wizard) {
     wizard.querySelectorAll('[data-step-label]').forEach((label,i) => label.setAttribute('aria-current',i===step?'step':'false'));
     previous.hidden=step===0; next.hidden=step===4;
     if (step===3) shareFields();
-    if (step===4) {const review=document.querySelector('#review'); review.replaceChildren(); const data=payload(); for (const text of [`${data.title} · ${data.mediaType} · ${data.sensitivity}`,`${data.creator.name} · ${data.language}`,data.contextNote,`${messages.terms}: ${data.license.preset} · ${messages.aiTraining}: ${data.license.aiTrainingAllowed?messages.aiAllowed:messages.aiNotAllowed}`,`${messages.stewardContact}: ${data.license.contactEmail}`,...data.contributors.map(p => `${p.name} (${p.role}): ${p.bps} bps · ${messages.granted}: ${Object.entries(p.consents).filter(([,v])=>v).map(([k])=>k).join(', ')||messages.none}`)]) {const p=document.createElement('p'); p.textContent=text; review.append(p);}}
+    if (step===4) {const review=document.querySelector('#review'); review.replaceChildren(); const data=payload(); for (const text of [`${data.title} · ${data.mediaType} · ${data.sensitivity}`,`${data.creator.name} · ${data.language}`,data.contextNote,`${messages.terms}: ${data.license.preset} · ${messages.aiTraining}: ${data.license.aiTrainingAllowed?messages.aiAllowed:messages.aiNotAllowed}`,`${messages.stewardContact}: ${data.license.contactEmail}`,...data.contributors.map(p => `${p.name} (${p.role}): ${p.percentage}% · ${messages.granted}: ${Object.entries(p.consents).filter(([,v])=>v).map(([k])=>k).join(', ')||messages.none}`)]) {const p=document.createElement('p'); p.textContent=text; review.append(p);}}
   }
-  function payload() {const f=wizard.elements; return {title:f.title.value,language:f.language.value,creator:{type:f.creatorType.value,name:f.creatorName.value,representativeName:f.representativeName.value},mediaType:f.mediaType.value,sensitivity:f.sensitivity.value,textBody:f.textBody.value,placeCoarse:f.placeCoarse.value,contextNote:f.contextNote.value,license:{preset:f.preset.value,aiTrainingAllowed:f.aiTrainingAllowed.checked,contactEmail:f.contactEmail.value,notes:f.notes.value},termsConfirmed:f.termsConfirmed.checked,sharesConfirmed:f.sharesConfirmed.checked,contributors:people().map(({key,...p})=>p)};}
+  function payload() {const f=wizard.elements; return {title:f.title.value,language:f.language.value,creator:{type:f.creatorType.value,name:f.creatorName.value,representativeName:f.representativeName.value},mediaType:f.mediaType.value,sensitivity:f.sensitivity.value,textBody:f.textBody.value,placeCoarse:f.placeCoarse.value,contextNote:f.contextNote.value,license:{preset:f.preset.value,aiTrainingAllowed:f.aiTrainingAllowed.checked,contactEmail:f.contactEmail.value,notes:f.notes.value},termsConfirmed:f.termsConfirmed.checked,sharesConfirmed:f.sharesConfirmed.checked,contributors:people().map(({key,bps,...p})=>p)};}
   next.addEventListener('click', () => {
     const invalid=[...sections[step].querySelectorAll('input,textarea,select')].find(field=>!field.checkValidity()); if (invalid) {invalid.reportValidity(); return;}
     if (step===0 && wizard.elements.creatorType.value==='COMMUNITY' && !wizard.elements.representativeName.value.trim()) {wizard.querySelector('.form-message').textContent=messages.addRepresentative; return;}
@@ -106,3 +107,4 @@ if (wizard) {
   wizard.addEventListener('submit',event=>{event.preventDefault();if(step!==4)return;submit(wizard,async()=>{const result=await send('/api/stories',payload(),'POST',wizard.elements.media.files[0]);location.href=`/p/${result.id}`;});});
   addPerson(); show();
 }
+

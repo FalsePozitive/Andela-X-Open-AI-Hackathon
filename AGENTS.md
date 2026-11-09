@@ -114,3 +114,7 @@ The original commands and Next.js layout above are superseded by README.md and d
 ## Okwethu visual update
 User-approved name: Okwethu (Ours). Goldenrod #DAA520 is the primary brand colour. Public copy uses Demo instead of MOCK while clearly identifying simulated payments. The rebrand spans frontend, copy and amount formatting; it changes no financial or consent behavior.
 
+
+## Passport/media update
+User-approved additions: visible percentage shares totalling 100% (stored as exact integer basis points), QR-marked image derivatives, browser video export, audio plus QR-cover ZIP downloads, branded public PDF snapshots, and tighter logo tagline spacing. Originals and registration hashes remain private and unchanged. A media mark supports attribution; it is not copy protection or proof of ownership. This work spans registry, rules, frontend, exports, documentation and QA.
+

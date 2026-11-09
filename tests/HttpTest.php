@@ -47,6 +47,9 @@ final class HttpTest extends TestCase
         $story=$this->registry->create($data);
         foreach(['/api/stories/'.$story['id'],'/p/'.$story['id'],'/'] as $path){$response=$this->call('GET',$path);self::assertSame(200,$response['status']);self::assertStringContainsString('no-store',$response['headers']);foreach(['SECRET_TITLE_1907','SECRET_CONTENT_1907','SECRET_CONTEXT_1907','SECRET_LOCATION_1907','filePath','contentHash'] as $secret){self::assertStringNotContainsString($secret,$response['body']);}}
         self::assertSame(404,$this->call('GET','/media/'.$story['id'])['status']);
+        self::assertSame(404,$this->call('GET','/api/stories/'.$story['id'].'/cover')['status']);
+        self::assertSame(404,$this->call('GET','/api/stories/'.$story['id'].'/download')['status']);
+        $pdf=$this->call('GET','/api/stories/'.$story['id'].'/pdf');self::assertSame(200,$pdf['status']);self::assertStringStartsWith('%PDF-',$pdf['body']);file_put_contents(__DIR__.'/.runtime/exports/http-restricted.pdf',$pdf['body']);
         self::assertSame(404,$this->call('GET','/storage/uploads/anything')['status']);
         self::assertSame(404,$this->call('GET','/config/local.php')['status']);
     }
@@ -76,5 +79,16 @@ final class HttpTest extends TestCase
         $this->login();$created=$this->call('POST','/api/stories',Demo::payload());self::assertSame(201,$created['status']);$id=json_decode($created['body'],true)['id'];
         foreach(['/dashboard','/dashboard/new','/dashboard/requests','/dashboard/claims','/dashboard/stories/'.$id,'/ledger'] as $path){$page=$this->call('GET',$path);self::assertSame(200,$page['status'],$path);if($path==='/dashboard/new'){file_put_contents(__DIR__.'/.runtime/wizard.html',$page['body']);}}
         $malformed=$this->call('POST','/api/stories',['title'=>[]]);self::assertSame(422,$malformed['status']);self::assertSame('VALIDATION',json_decode($malformed['body'],true)['error']['code']);
+    }
+
+    public function testPercentageRegistrationAndMarkedImageDownload():void
+    {
+        $this->login();$data=Demo::payload();$data['mediaType']='image';
+        foreach($data['contributors'] as &$person){$person['percentage']=(string)($person['bps']/100);unset($person['bps']);}unset($person);
+        $source=__DIR__.'/.runtime/upload.png';$image=imagecreatetruecolor(800,600);imagefill($image,0,0,imagecolorallocate($image,255,210,127));imagepng($image,$source);imagedestroy($image);
+        $curl=curl_init($this->url.'/api/stories');curl_setopt_array($curl,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_POST=>true,CURLOPT_COOKIEJAR=>$this->cookies,CURLOPT_COOKIEFILE=>$this->cookies,CURLOPT_HTTPHEADER=>['X-CSRF-Token: '.$this->csrf],CURLOPT_POSTFIELDS=>['payload'=>json_encode($data,JSON_THROW_ON_ERROR),'media'=>new CURLFile($source,'image/png','fixture.png')]]);
+        $body=curl_exec($curl);self::assertSame(201,curl_getinfo($curl,CURLINFO_RESPONSE_CODE),is_string($body)?$body:'No response');curl_close($curl);unset($curl);$id=json_decode($body,true,512,JSON_THROW_ON_ERROR)['id'];
+        $story=$this->registry->story($id);self::assertSame([7000,3000],array_column($story['shares'],'bps'));
+        foreach(['/media/'.$id,'/api/stories/'.$id.'/download'] as $url){$image=$this->call('GET',$url);self::assertSame(200,$image['status']);self::assertStringStartsWith("\x89PNG",$image['body']);self::assertStringContainsString('image/png',$image['headers']);}
     }
 }

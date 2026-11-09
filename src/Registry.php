@@ -58,7 +58,11 @@ final class Registry
                 $values[$purpose] = Input::bool($consents, $purpose);
             }
             $contributors[] = ['id' => $id, 'name' => Input::text($person, 'name'), 'role' => Input::text($person, 'role', 100), 'fund' => Input::bool($person, 'isCommunityFund'), 'consents' => $values];
-            $shares[] = ['contributorId' => $id, 'bps' => $person['bps'] ?? null];
+            $shareBps = array_key_exists('percentage', $person) ? Input::percentage($person['percentage']) : ($person['bps'] ?? null);
+            if (array_key_exists('percentage', $person) && array_key_exists('bps', $person) && $person['bps'] !== $shareBps) {
+                throw new Problem('INVALID_SPLIT', 'The percentage and legacy share value disagree.');
+            }
+            $shares[] = ['contributorId' => $id, 'bps' => $shareBps];
         }
         Rules::split($shares);
         $media = null;

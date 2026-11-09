@@ -15,7 +15,7 @@
   .site-header {@apply max-w-7xl mx-auto px-5 md:px-10 py-5 flex flex-wrap items-center justify-between gap-5 border-b border-ink/10;}
   .brand {@apply flex items-center gap-2 no-underline shrink-0;} .brand:hover {text-decoration:none;} .brand-symbol {width:54px;height:54px;}
   .brand-name {font-family:'Trebuchet MS','Segoe UI',sans-serif;font-size:32px;font-weight:700;letter-spacing:-1.8px;line-height:1;}
-  .brand-name small {@apply block text-bronze uppercase;font-size:9px;letter-spacing:2.3px;margin-top:8px;margin-left:2px;font-family:'Segoe UI',Arial,sans-serif;}
+  .brand-name small {@apply block text-bronze uppercase;font-size:9px;letter-spacing:2.3px;margin-top:0;margin-left:2px;font-family:'Segoe UI',Arial,sans-serif;}
   nav {@apply flex flex-wrap items-center gap-x-5 gap-y-3 text-sm font-semibold;} nav form {margin:0;} .nav-stories {@apply text-ink/80;}
   .button {@apply inline-flex justify-center items-center gap-5 rounded-full bg-goldenrod text-ink px-6 py-3 font-bold text-sm no-underline border border-transparent;min-height:48px;transition:background .18s,transform .18s;} .button:hover {@apply bg-honey no-underline;transform:translateY(-1px);} .button.secondary {@apply bg-transparent border-ink/30 text-ink;} .button.secondary:hover {@apply bg-palegold/50;} .button.small {@apply px-5 py-2;min-height:42px;} .text-button {@apply underline text-sm bg-transparent border-0 py-3;min-height:44px;} .skip {@apply absolute bg-white p-4 -top-24 z-50;} .skip:focus {@apply top-0;}
   .hero {@apply grid lg:grid-cols-2 gap-12 lg:gap-16 items-center py-12 md:py-16;} .hero-copy {max-width:600px;} .hero h1 {font-size:clamp(3.4rem,6.5vw,5.7rem);line-height:1.01;letter-spacing:-.055em;margin:26px 0;} .hero h1 em {@apply text-bronze;}
@@ -55,3 +55,8 @@
   .faq-subtitle {@apply text-xl font-semibold;} .faq-layout {@apply grid lg:grid-cols-[250px_minmax(0,1fr)] gap-8 lg:gap-12;} .faq-toc {@apply flex flex-col items-stretch self-start p-5 rounded-2xl bg-palegold/55 lg:sticky lg:top-6;} .faq-toc a {@apply flex items-center justify-between gap-4 py-2 text-sm;} .faq-section {@apply mb-12;scroll-margin-top:2rem;} .faq-section h2 {@apply text-2xl md:text-3xl;} .faq-questions {@apply border border-ink/15 rounded-2xl bg-[#FFFDF7] overflow-hidden;} .faq-item {@apply border-b border-ink/15;} .faq-item:last-child {border-bottom:0;} .faq-item summary {@apply relative px-5 md:px-6 py-5 pr-12 font-semibold text-base;list-style:none;letter-spacing:-.01em;min-height:56px;} .faq-item summary::-webkit-details-marker {display:none;} .faq-item summary:after {content:'+';position:absolute;right:22px;top:18px;font-size:22px;font-weight:400;color:var(--bronze);} .faq-item[open] summary {@apply bg-palegold/40;} .faq-item[open] summary:after {content:'−';} .faq-answer {@apply px-5 md:px-6 pb-6 pt-4 text-sm leading-relaxed text-ink/80;} .faq-answer p:last-child {@apply mb-0;} .faq-answer ol {@apply list-decimal pl-5 space-y-3 my-4;} .faq-answer a {@apply font-semibold underline text-bronze;} .faq-item summary:focus-visible {outline-offset:-4px;}
 }
 @media print {.info-heading {padding-top:0;} .faq-layout {display:block;} .faq-toc {display:none;} .faq-answer {display:block;} }
+
+@layer components {
+  .media-download {@apply my-6 rounded-2xl p-5 bg-palegold/40 border border-bronze/20;} .media-download h2 {@apply text-xl;} .media-download p {@apply text-sm;} .media-download .button {@apply text-xs;} .pdf-download {@apply mt-5 w-full;}
+}
+

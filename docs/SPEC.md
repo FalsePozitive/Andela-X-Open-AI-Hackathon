@@ -51,3 +51,6 @@ All API errors: `{ "error": { "code": "...", "message": "...", "fields": {} } }`
 Creation accepts a JSON object with story fields, `creator:{type,name,representativeName}`, `license:{preset,aiTrainingAllowed,contactEmail,notes}`, `contributors:[{name,role,isCommunityFund,bps,consents:{RECORD,PUBLISH,TRANSLATE,COMMERCIAL,AI_TRAINING}}]`, and explicit `termsConfirmed:true`, `sharesConfirmed:true`. Files use multipart `payload` containing that JSON and `media` containing the file. Client-supplied IDs/paths/hashes/status are not used.
 
 Target subdomain: https://okwethu.wilmans.co.za. Hosted access and provider-specific preflight checks remain operational prerequisites, not verified local facts.
+
+See [Passport/media exports](PASSPORT-EXPORTS.md) for percentage inputs, QR-marked downloads and branded PDFs. No database migration is required.
+

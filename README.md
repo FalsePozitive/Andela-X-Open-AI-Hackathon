@@ -38,3 +38,5 @@ Database integration tests require ignored `config/test.php` pointing to a dedic
 - [Review](docs/REVIEW.md): results and checks that still require hosting access.
 
 The initial implementation spans registry, rules, frontend, demo and QA ownership areas under the user-approved unified build plan. No external payment, identity, email-sending, analytics, or AI services are integrated.
+
+For a subdomain folder without SSH, use [Deploy without SSH](docs/DEPLOYMENT-SHARED.md).

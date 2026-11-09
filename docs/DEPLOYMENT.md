@@ -1,5 +1,7 @@
 # Xneelo deployment and rollback
 
+**No SSH or access above public_html?** Use [the shared-hosting instructions](DEPLOYMENT-SHARED.md) and the xneelo-shared bundle. It fits inside the subdomain directory and uses phpMyAdmin import. The layout below is the alternative for accounts with access outside the web root.
+
 ## Hosting layout
 
 Target: **https://okwethu.wilmans.co.za** (supplied by the user). Its document root must contain **only the contents of `public/`**, including `.htaccess`. Keep the rest of the release outside that root:
@@ -47,3 +49,4 @@ Use a separate migration account for schema changes. Runtime database grants sho
 ## Release gate requiring account access
 
 Real HTTPS/subdomain routing, provider PHP extensions, server filesystem permissions, account database grants, external-phone QR scan, redeployment persistence and backup restoration must be checked on Xneelo. Local tests cannot certify these. Do not describe the app as live until these pass.
+

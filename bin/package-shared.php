@@ -37,7 +37,7 @@ $destination->addFromString('_passport/config/local.php',$configuration);
 $destination->addFromString('_passport/.htaccess',"Require all denied\n");
 $destination->addFromString('_passport/access-check.txt',"PRIVATE FOLDER CHECK: this text must never be publicly readable.\n");
 $destination->addEmptyDir('_passport/storage/uploads');
-$destination->addFromString('.htaccess',"Options -Indexes -MultiViews\nDirectoryIndex index.php\nRequire all granted\nRewriteEngine On\nRewriteRule ^_passport(?:/|$) - [F,L,NC]\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteRule ^ index.php [QSA,L]\n<FilesMatch \"(^\\.|\\.(zip|sql|log|bak|env|ini)$)\">\n Require all denied\n</FilesMatch>\n");
+$destination->addFromString('.htaccess',"Options -Indexes -MultiViews\nDirectoryIndex index.php\nRequire all granted\nRewriteEngine On\nRewriteRule ^_passport(?:/|$) - [F,L,NC]\nRewriteCond %{HTTPS} !=on\nRewriteRule ^ ".$config['base_url']."%{REQUEST_URI} [R=308,L,NE]\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteRule ^ index.php [QSA,L]\n<FilesMatch \"(^\\.|\\.(zip|sql|log|bak|env|ini)$)\">\n Require all denied\n</FilesMatch>\n");
 $schema=(string)file_get_contents($root.'/database/migrations/001_registry.sql');
 $schema.="\nCREATE TABLE IF NOT EXISTS migrations (version VARCHAR(100) PRIMARY KEY, applied_at DATETIME(6) NOT NULL) ENGINE=InnoDB;\nINSERT INTO migrations VALUES ('001_registry.sql',UTC_TIMESTAMP(6));\n";
 $seedDir=$argv[2]??null;

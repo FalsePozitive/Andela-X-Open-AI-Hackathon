@@ -27,8 +27,39 @@ final class Web
         }
     }
 
+    public static function httpsRedirect(array $config, array $server): ?string
+    {
+        if ($config['environment'] !== 'production') {
+            return null;
+        }
+        $secure = in_array(strtolower((string) ($server['HTTPS'] ?? '')), ['on', '1'], true)
+            || (int) ($server['SERVER_PORT'] ?? 0) === 443;
+        if ($secure) {
+            return null;
+        }
+        $base = rtrim($config['base_url'], '/');
+        if (!str_starts_with($base, 'https://')) {
+            throw new \RuntimeException('Production requires an HTTPS base URL.');
+        }
+        $uri = $server['REQUEST_URI'] ?? '/';
+        if (!is_string($uri) || !str_starts_with($uri, '/') || preg_match('/[\r\n]/', $uri)) {
+            $uri = '/';
+        }
+        // Never trust Host or arbitrary forwarded headers for the redirect.
+        return $base . $uri;
+    }
+
     public function run(): void
     {
+        $redirect = self::httpsRedirect($this->config, $_SERVER);
+        if ($redirect !== null) {
+            header('Cache-Control: no-store');
+            header('Location: ' . $redirect, true, 308);
+            return;
+        }
+        if ($this->config['environment'] === 'production') {
+            header('Strict-Transport-Security: max-age=31536000');
+        }
         session_name('passport_session');
         session_set_cookie_params(['httponly' => true, 'secure' => $this->config['environment'] === 'production', 'samesite' => 'Lax', 'path' => '/']);
         session_start();

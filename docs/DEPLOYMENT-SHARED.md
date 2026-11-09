@@ -87,3 +87,5 @@ Check one open passport, its QR download, the restricted passport, a blocked com
 This is an **initial-install bundle** with a generated login and sample database. Do not overwrite `_passport/config/local.php` or `_passport/storage/` when updating. Do not re-import the starter SQL into an active database. Export a database backup with phpMyAdmin and download the private uploads through File Manager/FTP first. Keep backups on your computer, never in the public website directory.
 
 On-host Apache protection, PHP extensions, database compatibility, phone QR access, browser accessibility, persistence and backup restoration still need to be verified on Xneelo; a locally built ZIP does not certify them.
+
+For repeated form expiry over HTTP, open https://okwethu.wilmans.co.za/login and see [the HTTPS fix](HTTPS-FIX.md).

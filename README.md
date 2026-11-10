@@ -2,6 +2,9 @@
 
 A PHP 8.3 / MySQL hackathon proof of concept. Every passport records a **claim and declared terms**, not proof of ownership. Every ledger payment is **MOCK**.
 
+# Prototype at https://okwethu.wilmans.co.za
+Fully working prototype with QR code generation, CRUD updates, PDF export, and logins
+
 ## Run locally
 
 Requirements: PHP 8.3+ with PDO MySQL, fileinfo, GD, mbstring, session; MySQL 8 or MariaDB 10.11; Composer; Node 18+ for CSS builds only.

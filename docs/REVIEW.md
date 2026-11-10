@@ -1,5 +1,11 @@
 # QA and release review
 
+## Reading these checkpoints
+
+The entries below describe the initial implementation at their recorded checkpoint. They do not describe every later feature or constitute fresh verification of the current release. The community-tools release added individual community-scoped accounts, optional SMTP updates, private request tracking, sharing controls, version history and exports; current behavior is documented in [AGENTS.md](../AGENTS.md) and [Community tools](COMMUNITY-TOOLS.md).
+
+The later community-tools handover recorded 47 passing automated tests and local browser/PDF checks. The documentation update on 9 November 2026 does not rerun or supersede those results. Use [the step-by-step testing guide](TESTING.md) to record new results, including actual hosted HTTPS/Apache, phone QR, mailbox delivery and redeployment checks. Earlier statements about unavailable browser tools, fixed-login-only scope or absence of email integration are historical observations, not current feature restrictions.
+
 ## 2026-11-09 — Automated verification
 
 - Finding: PHP unit, database integration and HTTP suites pass: 22 tests, 2,609 assertions at the recorded checkpoint. These cover randomized integer allocations, unambiguous IDs, missing/refused commercial consent, AI term/consent gates, atomic registration, consent history, immutable approval snapshots, counter/decline behavior, currency separation, append-only corrections and concurrent approval idempotence.

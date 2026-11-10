@@ -32,6 +32,10 @@ Database integration tests require ignored `config/test.php` pointing to a dedic
 
 ## Handover
 
+- [Five-minute submission video](docs/SUBMISSION-VIDEO.md): timed narration, screen actions, suggested visuals and recording setup.
+
+- [Step-by-step testing guide](docs/TESTING.md): browser journeys, role/privacy checks, exports, optional email, local checks and hosted acceptance.
+
 - [Deployment](docs/DEPLOYMENT.md): Xneelo layout, configuration, upload, backup, rollback.
 - [Demo](docs/DEMO.md): exact three-minute script and fallback.
 - [Specification](docs/SPEC.md): current PHP interfaces and resolved design decisions.
